@@ -19,6 +19,7 @@ using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using static VaultEagleConsole.ServerUtils;
+using VaultEagleLib;
 
 namespace VaultEagleConsole
 {

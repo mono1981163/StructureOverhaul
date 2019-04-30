@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using VaultEagle;
+using VaultEagleLib;
 using Option = Common.DotNet.Extensions.Option;
 
 namespace VaultEagleConsole

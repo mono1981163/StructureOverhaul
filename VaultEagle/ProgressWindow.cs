@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows.Forms;
 
 using Common.DotNet.Extensions;
+using VaultEagleLib;
 
 namespace VaultEagle
 {

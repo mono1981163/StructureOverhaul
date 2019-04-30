@@ -17,6 +17,7 @@ using Autodesk.DataManagement.Client.Framework.Vault.Currency.Properties;
 using Newtonsoft.Json;
 
 using Common.DotNet.Extensions;
+using VaultEagleLib;
 
 namespace VaultEagle
 {

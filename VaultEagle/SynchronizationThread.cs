@@ -17,6 +17,7 @@ using System.Windows.Forms;
 using Autodesk.Connectivity.WebServices;
 
 using Common.DotNet.Extensions;
+using VaultEagleLib;
 
 namespace VaultEagle
 {

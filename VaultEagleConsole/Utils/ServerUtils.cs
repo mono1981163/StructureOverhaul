@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using VaultEagle;
+using VaultEagleLib;
 
 namespace VaultEagleConsole
 {
