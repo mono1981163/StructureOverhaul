@@ -12,6 +12,46 @@ namespace VaultEagle
     public class VaultUtils
     {
 
+        public enum FileState { Ok, Obsolete, None }
+
+        public static bool CheckIfShared(Vault.Currency.Connections.Connection connection, AWS.File file)
+        {
+            AWS.Folder[] folders = connection.WebServiceManager.DocumentService.GetFoldersByFileMasterId(file.MasterId);
+
+            return (folders.Length > 1);
+        }
+
+        public static FileState GetLastRelevantFileState(int fileVersion, long fileMasterId, Vault.Currency.Connections.Connection connection, ref AWS.File releasedFile, List<string> states, List<string> invalidStates)
+        {
+            AWS.File file = connection.WebServiceManager.DocumentService.GetFileByVersion(fileMasterId, fileVersion);
+
+            foreach (string state in states)
+            {
+                if (file.FileLfCyc.LfCycStateName.Equals(state, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    releasedFile = file;
+                    return FileState.Ok;
+                }
+                // else if (file.FileLfCyc.LfCycStateName.Equals("Obsolete", StringComparison.CurrentCultureIgnoreCase))
+                //  return FileState.Obsolete;
+            }
+            foreach (string state in invalidStates)
+            {
+                if (file.FileLfCyc.LfCycStateName.Equals(state, StringComparison.CurrentCultureIgnoreCase))
+                    return FileState.Obsolete;
+            }
+            try
+            {
+                if (string.IsNullOrWhiteSpace(file.FileLfCyc.LfCycStateName))
+                    return FileState.None;
+                return fileVersion == 1 ? FileState.None : GetLastRelevantFileState(fileVersion - 1, fileMasterId, connection, ref releasedFile, states, invalidStates);
+            }
+            catch
+            {
+                return FileState.None;
+            }
+        }
+
         public static string GetLocalFolder(string vaultFolderPath, string localPath, List<Tuple<string, string>> folderMappings)
         {
             string vaultFolder = localPath + System.IO.Path.Combine(vaultFolderPath.Substring(1)).Replace('/', '\\');
@@ -42,46 +82,6 @@ namespace VaultEagle
             return serverName;
         }
 
-        public static bool IsShared(Vault.Currency.Connections.Connection connection, AWS.File file)
-        {
-            return connection.WebServiceManager.DocumentService.GetFoldersByFileMasterId(file.MasterId).Length > 1;
-        }
-
-
-        public enum FileState { Ok, Obsolete, None }
-
-        public static FileState GetLastRelevantFileState(int fileVersion, long fileMasterId, Vault.Currency.Connections.Connection connection, ref AWS.File releasedFile, List<string> states, List<string> invalidStates)
-        {
-            AWS.File file = connection.WebServiceManager.DocumentService.GetFileByVersion(fileMasterId, fileVersion);
-
-            foreach (string state in states)
-            {
-                if (file.FileLfCyc.LfCycStateName.Equals(state, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    releasedFile = file;
-                    return FileState.Ok;
-                }
-               // else if (file.FileLfCyc.LfCycStateName.Equals("Obsolete", StringComparison.CurrentCultureIgnoreCase))
-                  //  return FileState.Obsolete;
-            }
-            foreach (string state in invalidStates)
-            {
-                if (file.FileLfCyc.LfCycStateName.Equals(state, StringComparison.CurrentCultureIgnoreCase))
-                    return FileState.Obsolete;
-            }
-            try
-            {
-                if (string.IsNullOrWhiteSpace(file.FileLfCyc.LfCycStateName))
-                    return FileState.None;
-                return fileVersion == 1 ? FileState.None : GetLastRelevantFileState(fileVersion - 1, fileMasterId, connection, ref releasedFile, states, invalidStates);
-            }
-            catch
-            {
-                return FileState.None;
-            }
-        }
-
-        /*************************************************************************************/
         public static T HandleNetworkErrors<T>(Func<T> function, int retries)
         {
             Option<string> error = Option.None;
@@ -90,8 +90,9 @@ namespace VaultEagle
                 T result = default(T);
                 try
                 {
-                    /*result = */return function();
-                  //  return result;
+                    /*result = */
+                    return function();
+                    //  return result;
                 }
                 catch (Exception ex)
                 {
@@ -106,21 +107,18 @@ namespace VaultEagle
                 throw new Exception("Too many network errors.");
         }
 
-        /******************************************************************************************/
         public static void HandleNetworkErrors(Action action, int retries)
         {
             HandleNetworkErrors(() => { action(); return 0; }, retries);
 
         }
 
-        /********************************************************************************************/
-        public static bool CheckIfShared(Vault.Currency.Connections.Connection connection, AWS.File file)
+        public static bool IsShared(Vault.Currency.Connections.Connection connection, AWS.File file)
         {
-           AWS.Folder[] folders = connection.WebServiceManager.DocumentService.GetFoldersByFileMasterId(file.MasterId);
-
-            return (folders.Length > 1);
+            return connection.WebServiceManager.DocumentService.GetFoldersByFileMasterId(file.MasterId).Length > 1;
         }
-
-
+        /*************************************************************************************/
+        /******************************************************************************************/
+        /********************************************************************************************/
     }
 }

@@ -11,6 +11,7 @@ namespace VaultEagle
     [Serializable]
     public class VaultServerException : Exception
     {
+        public string ServerStackTrace;
         const string exceptionClassName = "VaultServerException";
         private const string vaultExceptionSignatureString = "http://streamline.autodesk.com/faultschema";
 
@@ -19,9 +20,6 @@ namespace VaultEagle
         {
             ServerStackTrace = GetServerStackTrace(soapEx) ?? "<no server stacktrace>";
         }
-
-        public string ServerStackTrace;
-
         public override string StackTrace
         {
             get
@@ -30,25 +28,19 @@ namespace VaultEagle
             }
         }
 
-        private static string FormatVaultExceptionMessage(SoapException ex)
+        public static string FormatException(Exception exception)
         {
-            return "\r\n\r\n" + GetVaultServerErrorInfo(ex).Trim() + Environment.NewLine + Environment.NewLine;
+            return FormatVaultException(exception as SoapException)
+                   ?? exception.ToString();
         }
 
-        public static Exception WrapVaultException(SoapException soapEx)
+        public static string FormatVaultException(SoapException ex)
         {
-            return new VaultServerException(soapEx);
-        }
-
-        public static Exception WrapException(Exception ex)
-        {
-            var soapEx = ex as SoapException;
-            if(soapEx != null)
-            {
-                if (soapEx.Detail != null && soapEx.Detail.InnerXml.Contains(vaultExceptionSignatureString))
-                    return WrapVaultException(soapEx);
-            }
-            return ex;
+            if (ex == null)
+                return null;
+            return "Vault Server Error:\r\n\r\n" + GetVaultServerErrorInfo(ex) + "\r\n"
+                   + ex.ToString() + "\r\n"
+                   + (GetServerStackTrace(ex) ?? "<no server stacktrace>") + "\r\n";
         }
 
         public static string GetNameAndDescription(SoapException ex)
@@ -61,17 +53,6 @@ namespace VaultEagle
             }
             catch (Exception) { }
             return nameAndDescription;
-        }
-
-        public static string GetServerStackTrace(SoapException ex)
-        {
-            string stackTrace = null;
-            try
-            {
-                stackTrace = ex.Detail["sl:sldetail"]["sl:stack"].InnerText.Replace("\r\n", "\n").Replace("\n", "\r\n");
-            }
-            catch (Exception) { }
-            return stackTrace;
         }
 
         public static SortedDictionary<int, string> GetParams(SoapException ex)
@@ -143,19 +124,15 @@ namespace VaultEagle
             return null;
         }
 
-        public static string FormatException(Exception exception)
+        public static string GetServerStackTrace(SoapException ex)
         {
-            return FormatVaultException(exception as SoapException)
-                   ?? exception.ToString();
-        }
-
-        public static string FormatVaultException(SoapException ex)
-        {
-            if (ex == null)
-                return null;
-            return "Vault Server Error:\r\n\r\n" + GetVaultServerErrorInfo(ex) + "\r\n"
-                   + ex.ToString() + "\r\n"
-                   + (GetServerStackTrace(ex) ?? "<no server stacktrace>") + "\r\n";
+            string stackTrace = null;
+            try
+            {
+                stackTrace = ex.Detail["sl:sldetail"]["sl:stack"].InnerText.Replace("\r\n", "\n").Replace("\n", "\r\n");
+            }
+            catch (Exception) { }
+            return stackTrace;
         }
 
         public static string GetVaultServerErrorInfo(SoapException ex)
@@ -168,16 +145,26 @@ namespace VaultEagle
                                        restrictionsString}.Where(s => s != null).ToArray());
         }
 
-        private static XmlNamespaceManager XmlIncantations(XmlNode node, string prefix)
+        public static Exception WrapException(Exception ex)
         {
-            var xmlDocument = node as System.Xml.XmlDocument;
-            if (xmlDocument == null)
-                xmlDocument = node.OwnerDocument;
-            var nsmgr = new XmlNamespaceManager(xmlDocument.NameTable);
-            nsmgr.AddNamespace(prefix, node.FirstChild.NamespaceURI);
-            return nsmgr;
+            var soapEx = ex as SoapException;
+            if (soapEx != null)
+            {
+                if (soapEx.Detail != null && soapEx.Detail.InnerXml.Contains(vaultExceptionSignatureString))
+                    return WrapVaultException(soapEx);
+            }
+            return ex;
         }
 
+        public static Exception WrapVaultException(SoapException soapEx)
+        {
+            return new VaultServerException(soapEx);
+        }
+
+        private static string FormatVaultExceptionMessage(SoapException ex)
+        {
+            return "\r\n\r\n" + GetVaultServerErrorInfo(ex).Trim() + Environment.NewLine + Environment.NewLine;
+        }
         private static string GetParamsString(SoapException ex)
         {
             var @params = GetParams(ex);
@@ -192,20 +179,19 @@ namespace VaultEagle
             return paramsString;
         }
 
+        private static XmlNamespaceManager XmlIncantations(XmlNode node, string prefix)
+        {
+            var xmlDocument = node as System.Xml.XmlDocument;
+            if (xmlDocument == null)
+                xmlDocument = node.OwnerDocument;
+            var nsmgr = new XmlNamespaceManager(xmlDocument.NameTable);
+            nsmgr.AddNamespace(prefix, node.FirstChild.NamespaceURI);
+            return nsmgr;
+        }
         #region Test exceptions
 
         //VaultErrorCodes.ThrowDatabaseExistsVaultException();
         //VaultErrorCodes.ThrowRestrictionVaultException();
-
-        public static void ThrowRestrictionVaultException()
-        {
-            XmlDocument doc = new XmlDocument();
-            string xmlData =
-                "<detail><sl:sldetail xmlns:sl=\"http://streamline.autodesk.com/faultschema\">  <sl:errorcode>1387</sl:errorcode>  <sl:mesg-id>632521940579843750</sl:mesg-id><sl:stack>\nServer stack trace:  at Connectivity.Product.Services.ItemService.CheckRestrictionsByItemIterationIds(ProductRestrictionCodes[] restrictionCodes, Int64[] itemIterationIds) in H:\\Server\\Product\\Services\\ItemService.cs:line 114 at Connectivity.Product.Services.ItemService.CheckRestrictionsByItemRevisionIds(ProductRestrictionCodes[] restrictionCodes, Int64[] itemRevisionIds) in H:\\Server\\Product\\Services\\ItemService.cs:line 97 at Connectivity.Product.Services.ItemService.EditItemRevisionInternal(Int64 itemRevId, Boolean bypassWIPRestriction) in H:\\Server\\Product\\Services\\ItemService.cs:line 1149 at Connectivity.Product.Services.ItemService.EditItemRevisionInternal(Int64 itemRevId) in H:\\Server\\Product\\Services\\ItemService.cs:line 1128 at Connectivity.Product.Services.ItemService.EditItemRevision(Int64 itemRevId) in H:\\Server\\Product\\Services\\ItemService.cs:line 1124 at System.Runtime.Remoting.Messaging.Message.Dispatch(Object target, Boolean fExecuteInContext) at System.Runtime.Remoting.Messaging.StackBuilderSink.SyncProcessMessage(IMessage msg, Int32 methodPtr, Boolean fExecuteInContext)Exception rethrown at [0]:  at System.Runtime.Remoting.Proxies.RealProxy.HandleReturnMessage(IMessage reqMsg, IMessage retMsg) at System.Runtime.Remoting.Proxies.RealProxy.PrivateInvoke(MessageData&amp; msgData, Int32 type) at Connectivity.Product.Services.ItemService.EditItemRevision(Int64 itemRevId) in H:\\Server\\Product\\Services\\ItemService.cs:line 1124 at Connectivity.Web.Services.ItemService.EditItemRevision(Int64 itemRevisionId) in H:\\Server\\Web\\Services\\ItemService.asmx.cs:line 780</sl:stack><sl:restrictions>  <sl:restriction sl:code=\"2001\">    <sl:param sl:index=\"0\">000001</sl:param>    <sl:param sl:index=\"1\">Test Item</sl:param>    <sl:param sl:index=\"2\">2</sl:param>    <sl:param sl:index=\"3\">Released</sl:param>  </sl:restriction></sl:restrictions></sl:sldetail></detail>";
-            doc.LoadXml(xmlData);
-            var soapException = new SoapException("a", XmlQualifiedName.Empty, "abc", doc.FirstChild);
-            throw soapException;
-        }
 
         public static void ThrowDatabaseExistsVaultException()
         {
@@ -217,6 +203,15 @@ namespace VaultEagle
             throw soapException;
         }
 
+        public static void ThrowRestrictionVaultException()
+        {
+            XmlDocument doc = new XmlDocument();
+            string xmlData =
+                "<detail><sl:sldetail xmlns:sl=\"http://streamline.autodesk.com/faultschema\">  <sl:errorcode>1387</sl:errorcode>  <sl:mesg-id>632521940579843750</sl:mesg-id><sl:stack>\nServer stack trace:  at Connectivity.Product.Services.ItemService.CheckRestrictionsByItemIterationIds(ProductRestrictionCodes[] restrictionCodes, Int64[] itemIterationIds) in H:\\Server\\Product\\Services\\ItemService.cs:line 114 at Connectivity.Product.Services.ItemService.CheckRestrictionsByItemRevisionIds(ProductRestrictionCodes[] restrictionCodes, Int64[] itemRevisionIds) in H:\\Server\\Product\\Services\\ItemService.cs:line 97 at Connectivity.Product.Services.ItemService.EditItemRevisionInternal(Int64 itemRevId, Boolean bypassWIPRestriction) in H:\\Server\\Product\\Services\\ItemService.cs:line 1149 at Connectivity.Product.Services.ItemService.EditItemRevisionInternal(Int64 itemRevId) in H:\\Server\\Product\\Services\\ItemService.cs:line 1128 at Connectivity.Product.Services.ItemService.EditItemRevision(Int64 itemRevId) in H:\\Server\\Product\\Services\\ItemService.cs:line 1124 at System.Runtime.Remoting.Messaging.Message.Dispatch(Object target, Boolean fExecuteInContext) at System.Runtime.Remoting.Messaging.StackBuilderSink.SyncProcessMessage(IMessage msg, Int32 methodPtr, Boolean fExecuteInContext)Exception rethrown at [0]:  at System.Runtime.Remoting.Proxies.RealProxy.HandleReturnMessage(IMessage reqMsg, IMessage retMsg) at System.Runtime.Remoting.Proxies.RealProxy.PrivateInvoke(MessageData&amp; msgData, Int32 type) at Connectivity.Product.Services.ItemService.EditItemRevision(Int64 itemRevId) in H:\\Server\\Product\\Services\\ItemService.cs:line 1124 at Connectivity.Web.Services.ItemService.EditItemRevision(Int64 itemRevisionId) in H:\\Server\\Web\\Services\\ItemService.asmx.cs:line 780</sl:stack><sl:restrictions>  <sl:restriction sl:code=\"2001\">    <sl:param sl:index=\"0\">000001</sl:param>    <sl:param sl:index=\"1\">Test Item</sl:param>    <sl:param sl:index=\"2\">2</sl:param>    <sl:param sl:index=\"3\">Released</sl:param>  </sl:restriction></sl:restrictions></sl:sldetail></detail>";
+            doc.LoadXml(xmlData);
+            var soapException = new SoapException("a", XmlQualifiedName.Empty, "abc", doc.FirstChild);
+            throw soapException;
+        }
         #endregion
     }
 

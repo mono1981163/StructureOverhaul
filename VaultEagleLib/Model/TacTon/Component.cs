@@ -10,27 +10,24 @@ namespace VaultEagleLib.Model.TacTon
 {
     public class Component
     {
-        public string Name { get; private set; }
-       // public string Description { get; private set; }
-       // public string FeatureValues { get; private set; }
-        public Dictionary<string, string> Properties { get; private set; }
-
-        
-
         public Component(string name/*, string description, string featureValues,*/, Dictionary<string, string> properties)
         {
             Name = name;
-         //   Description = description;
-         //   FeatureValues = featureValues;
+            //   Description = description;
+            //   FeatureValues = featureValues;
             Properties = properties;
         }
 
+        public string Name { get; private set; }
+        // public string Description { get; private set; }
+        // public string FeatureValues { get; private set; }
+        public Dictionary<string, string> Properties { get; private set; }
         public static Component Read(XmlElement componentElement, string assemblyPath)
         {
             List<string> propertiesToCheck = new List<string>() { "da_drawing", "da_assembly", "da_document" };
             string name = XmlTools.ReadString(componentElement, "name");
-           // string description = XmlTools.ReadString(componentElement, "description");
-           // string featureValues = XmlTools.ReadString(componentElement, "feature-values");
+            // string description = XmlTools.ReadString(componentElement, "description");
+            // string featureValues = XmlTools.ReadString(componentElement, "feature-values");
             Option<XmlElement> propertiesElement = XmlTools.SafeGetElement(componentElement, "properties");
             Dictionary<string, string> properties = new Dictionary<string, string>();
             if (propertiesElement.IsSome)

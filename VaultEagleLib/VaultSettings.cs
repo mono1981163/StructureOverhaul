@@ -9,11 +9,10 @@ namespace VaultEagleLib
 {
     public class VaultSettings
     {
-        public string Server { get; private set; }
-        public string Vault { get; private set; }
-        public string UserName { get; private set; }
         public string Password { get; private set; }
-
+        public string Server { get; private set; }
+        public string UserName { get; private set; }
+        public string Vault { get; private set; }
         public static VaultSettings Read(XmlElement element)
         {
             string server = MCAD.XmlCommon.XmlTools.ReadString(element, "server");

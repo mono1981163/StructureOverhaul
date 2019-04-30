@@ -10,6 +10,26 @@ namespace VaultEagle
 {
     public static class FilesAndFolders
     {
+        public static string GetConfigPath(bool createFolder = false)
+        {
+            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.conf");
+        }
+
+        public static string GetDefaultFunctionJsonCachePath(bool createFolder = false)
+        {
+            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.cache");
+        }
+
+        public static string GetLogPath(bool createFolder = false)
+        {
+            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.log");
+        }
+
+        public static string GetResumeStatePath(bool createFolder = false)
+        {
+            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.resumestate");
+        }
+
         public static string GetVaultEagleConfigFolder(bool createFolder = false)
         {
             VaultEagleLib.SynchronizerSettings appSet = VaultEagleLib.SynchronizerSettings.Read(5, Option.None);
@@ -25,26 +45,6 @@ namespace VaultEagle
             if (!Directory.Exists(folder))
                 Directory.CreateDirectory(folder);
             return folder;
-        }
-
-        public static string GetDefaultFunctionJsonCachePath(bool createFolder = false)
-        {
-            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.cache");
-        }
-
-        public static string GetLogPath(bool createFolder = false)
-        {
-            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.log");
-        }
-
-        public static string GetConfigPath(bool createFolder = false)
-        {
-            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.conf");
-        }
-
-        public static string GetResumeStatePath(bool createFolder = false)
-        {
-            return Path.Combine(GetVaultEagleConfigFolder(createFolder), "vaulteagle.resumestate");
         }
     }
 }

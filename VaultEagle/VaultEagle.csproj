@@ -122,7 +122,7 @@
     <Compile Include="ProgressWindow.designer.cs">
       <DependentUpon>ProgressWindow.cs</DependentUpon>
     </Compile>
-    <Compile Include="Extension.cs" />
+    <Compile Include="Extension\Extension.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReadOnlyForm.cs">
       <SubType>Form</SubType>
@@ -137,7 +137,7 @@
       <DependentUpon>ShowSubscriptionsForm.cs</DependentUpon>
     </Compile>
     <Compile Include="SynchronizationThread.cs" />
-    <Compile Include="ExtensionMethods.cs" />
+    <Compile Include="Extension\SynchronizationTreeExtension.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="applicationsettings.config">

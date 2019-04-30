@@ -20,7 +20,7 @@ namespace VaultEagleLib.Model.TacTon
             List<string> notExistingFiles = new List<string>();
             XmlDocument doc = new XmlDocument();
             doc.Load(path);
-           // string[] children = { "model", "component-classes", "component-class", "components" };
+            // string[] children = { "model", "component-classes", "component-class", "components" };
             XmlElement currentElement = doc.DocumentElement;
             XmlElement modelElement = XmlTools.GetElement(currentElement, "model");
             XmlElement componentClassesElement = XmlTools.GetElement(modelElement, "component-classes");
@@ -43,8 +43,6 @@ namespace VaultEagleLib.Model.TacTon
             List<Component> removeDuplicates = componentsWithProperties.DistinctBy(c => c.Properties.First()).ToList();
 
             return removeDuplicates;
-
-
         }
 
         private static List<Component> GetComponentsFromPart(string vaultPath, XmlElement rootPartElement)

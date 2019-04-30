@@ -13,25 +13,18 @@ namespace VaultEagleLib
 {
     public class SynchronizerSettings
     {
-        private static FileInfo ConfigurationFile { get { return new FileInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "SynchronizerSettings.config")); } }
         public string configPath { get; private set; }
-
+        public List<string> GetAndRun { get; private set; }
         public List<SynchronizationItem> Items { get; private set; }
         public Option<string> LastSyncFile { get; private set; }
-        public bool UseLastSync { get; private set; }
         public DateTime LastSyncTime { get; private set; }
-
-        public Option<string> OverrideMailSender { get; private set; }
-
-        public List<string> GetAndRun { get; private set; }
-        public string VaultRoot { get; private set; }
-
-        public MCADCommon.LogCommon.Utils.LogLevel LogLevel { get; private set; }
         public Option<string> LogFile { get; private set; }
+        public MCADCommon.LogCommon.Utils.LogLevel LogLevel { get; private set; }
+        public Option<string> OverrideMailSender { get; private set; }
         public int SavedLogCount { get; private set; }
-        
-
-
+        public bool UseLastSync { get; private set; }
+        public string VaultRoot { get; private set; }
+        private static FileInfo ConfigurationFile { get { return new FileInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "SynchronizerSettings.config")); } }
         public static SynchronizerSettings Read( int networkRetries, Option<MCADCommon.LogCommon.DisposableFileLogger> logger,string configurationPath = "")
         {
             SynchronizerSettings configuration = new SynchronizerSettings();

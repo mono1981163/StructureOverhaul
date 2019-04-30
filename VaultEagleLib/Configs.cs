@@ -13,6 +13,18 @@ namespace VaultEagle
 {
     public class Configs
     {
+        public static IEnumerable<string> GetLines(TextReader reader)
+        {
+            using (reader)
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    yield return line;
+                }
+            }
+        }
+
         public class ConfigConversionContext
         {
             public string VaultName = "";
@@ -21,29 +33,9 @@ namespace VaultEagle
 
         public class VaultEagleConfigV0_5
         {
-            public enum SyncStateV0_5 { Exclude, Include };
-
             public Dictionary<string, SyncStateV0_5> ExplicitPaths = new Dictionary<string, SyncStateV0_5>();
 
-            public SynchronizationTree.VaultEagleConfig UpgradeToLatest(ConfigConversionContext context)
-            {
-                return UpgradeToNext(context).UpgradeToLatest(context);
-            }
-
-            public VaultEagleConfigV1_0 UpgradeToNext(ConfigConversionContext context)
-            {
-                return new VaultEagleConfigV1_0
-                    {
-                        Vaults = new[]{ExplicitPaths.ToDictionary(kv => kv.Key.ToLowerInvariant(),
-                                                                   kv => new VaultEagleConfigV1_0.SyncInfoV1_0
-                                                                       {
-                                                                           State = (VaultEagleConfigV1_0.SyncStateV1_0) kv.Value,
-                                                                           Path = kv.Key
-                                                                       }).ToSortedDictionary()
-                                      }.ToDictionary(x => SynchronizationTree.GetVaultId(context.VaultName, context.VaultURI))
-                    };
-            }
-
+            public enum SyncStateV0_5 { Exclude, Include };
             public static VaultEagleConfigV0_5 ParseTree_Old(TextReader input)
             {
                 // Match e.g.:
@@ -72,18 +64,40 @@ namespace VaultEagle
                 }
                 return t;
             }
+
+            public SynchronizationTree.VaultEagleConfig UpgradeToLatest(ConfigConversionContext context)
+            {
+                return UpgradeToNext(context).UpgradeToLatest(context);
+            }
+
+            public VaultEagleConfigV1_0 UpgradeToNext(ConfigConversionContext context)
+            {
+                return new VaultEagleConfigV1_0
+                    {
+                        Vaults = new[]{ExplicitPaths.ToDictionary(kv => kv.Key.ToLowerInvariant(),
+                                                                   kv => new VaultEagleConfigV1_0.SyncInfoV1_0
+                                                                       {
+                                                                           State = (VaultEagleConfigV1_0.SyncStateV1_0) kv.Value,
+                                                                           Path = kv.Key
+                                                                       }).ToSortedDictionary()
+                                      }.ToDictionary(x => SynchronizationTree.GetVaultId(context.VaultName, context.VaultURI))
+                    };
+            }
         }
 
         public class VaultEagleConfigV1_0
         {
-            public enum SyncStateV1_0 { Exclude, Include, IncludeOnlyFolders };
-            public class SyncInfoV1_0
-            {
-                public SyncStateV1_0 State;
-                public string Path = "";
-            }
-
             public Dictionary<string, SortedDictionary<string, SyncInfoV1_0>> Vaults = new Dictionary<string, SortedDictionary<string, SyncInfoV1_0>>(StringComparer.OrdinalIgnoreCase);
+
+            public enum SyncStateV1_0 { Exclude, Include, IncludeOnlyFolders };
+            public static VaultEagleConfigV1_0 ParseForest_1_0(TextReader input)
+            {
+                using (var jsonR = new JsonTextReader(input))
+                    return new VaultEagleConfigV1_0
+                    {
+                        Vaults = new JsonSerializer().Deserialize<Dictionary<string, SortedDictionary<string, SyncInfoV1_0>>>(jsonR)
+                    };
+            }
 
             public SynchronizationTree.VaultEagleConfig UpgradeToLatest(ConfigConversionContext context)
             {
@@ -93,47 +107,39 @@ namespace VaultEagle
             public VaultEagleConfigV1_1 UpgradeToNext(ConfigConversionContext context)
             {
                 return new VaultEagleConfigV1_1
-                    {
-                        Vaults = Vaults.ToDictionary(x => x.Key,
+                {
+                    Vaults = Vaults.ToDictionary(x => x.Key,
                                                      x => x.Value.ToDictionary(kv => kv.Value.Path,
                                                                           kv => new VaultEagleConfigV1_1.SyncInfoV1_1
-                                                                              {
-                                                                                  State = (VaultEagleConfigV1_1.SyncStateV1_1)kv.Value.State
-                                                                              })
+                                                                          {
+                                                                              State = (VaultEagleConfigV1_1.SyncStateV1_1)kv.Value.State
+                                                                          })
                                                             .ToSortedDictionary(),
                                                      StringComparer.OrdinalIgnoreCase),
-                    };
+                };
             }
 
-            public static VaultEagleConfigV1_0 ParseForest_1_0(TextReader input)
+            public class SyncInfoV1_0
             {
-                using (var jsonR = new JsonTextReader(input))
-                    return new VaultEagleConfigV1_0
-                        {
-                            Vaults = new JsonSerializer().Deserialize<Dictionary<string, SortedDictionary<string, SyncInfoV1_0>>>(jsonR)
-                        };
+                public string Path = "";
+                public SyncStateV1_0 State;
             }
-
         }
 
         public class VaultEagleConfigV1_1
         {
-            public enum SyncStateV1_1 { Exclude, Include, IncludeOnlyFolders, IncludeOnlyFiles, IncludeOnlyDirectChildFolders, IncludeSingleFolder }
+            public string ConfigVersion = "1.1";
 
-            public class SyncInfoV1_1
-            {
-                public SyncStateV1_1 State;
-                public long LastVaultId = -1;
-
-                public VaultEagleConfigV2_0.SyncInfoV2_0 UpgradeToNext()
-                {
-                    return new VaultEagleConfigV2_0.SyncInfoV2_0 { LastVaultId = LastVaultId, State = (VaultEagleConfigV2_0.SyncStateV2_0) State };
-                }
-            }
+            public bool OverwriteLocallyModifiedFiles = true;
 
             public Dictionary<string, SortedDictionary<string, SyncInfoV1_1>> Vaults = new Dictionary<string, SortedDictionary<string, SyncInfoV1_1>>(StringComparer.OrdinalIgnoreCase);
-            public string ConfigVersion = "1.1";
-            public bool OverwriteLocallyModifiedFiles = true;
+
+            public enum SyncStateV1_1 { Exclude, Include, IncludeOnlyFolders, IncludeOnlyFiles, IncludeOnlyDirectChildFolders, IncludeSingleFolder }
+
+            public static VaultEagleConfigV1_1 ParseForest_1_1(JObject input)
+            {
+                return input.ToObject<VaultEagleConfigV1_1>(new JsonSerializer());
+            }
 
             public SynchronizationTree.VaultEagleConfig UpgradeToLatest(ConfigConversionContext context)
             {
@@ -143,60 +149,54 @@ namespace VaultEagle
             public VaultEagleConfigV2_0 UpgradeToNext(ConfigConversionContext context)
             {
                 return new VaultEagleConfigV2_0
-                    {
-                        Vaults = Vaults.ToDictionary(
+                {
+                    Vaults = Vaults.ToDictionary(
                                     x => x.Key,
                                     x => x.Value.ToDictionary(kv => kv.Key, kv => kv.Value.UpgradeToNext()).ToSortedDictionary(),
                                     StringComparer.OrdinalIgnoreCase),
-                    };
+                };
             }
 
-            public static VaultEagleConfigV1_1 ParseForest_1_1(JObject input)
+            public class SyncInfoV1_1
             {
-                return input.ToObject<VaultEagleConfigV1_1>(new JsonSerializer());
+                public long LastVaultId = -1;
+                public SyncStateV1_1 State;
+                public VaultEagleConfigV2_0.SyncInfoV2_0 UpgradeToNext()
+                {
+                    return new VaultEagleConfigV2_0.SyncInfoV2_0 { LastVaultId = LastVaultId, State = (VaultEagleConfigV2_0.SyncStateV2_0) State };
+                }
             }
         }
 
         public class VaultEagleConfigV2_0
         {
+            public string ConfigVersion = "2.0";
+
+            public bool OverwriteLocallyModifiedFiles = true;
+
+            public Dictionary<string, SortedDictionary<string, SyncInfoV2_0>> Vaults = new Dictionary<string, SortedDictionary<string, SyncInfoV2_0>>(StringComparer.OrdinalIgnoreCase);
+
             public enum SyncStateV2_0 { Exclude, Include, IncludeOnlyFolders, IncludeOnlyFiles, IncludeOnlyDirectChildFolders, IncludeSingleFolder, FromParent }
+
+            public SynchronizationTree.VaultEagleConfig UpgradeToLatest(ConfigConversionContext context)
+            {
+                return new SynchronizationTree.VaultEagleConfig
+                {
+                    Vaults = Vaults.ToDictionary(x => x.Key, x => x.Value.ToDictionary(kv => kv.Key,
+                                    kv => kv.Value.UpgradeToLatest()).ToSortedDictionary(), StringComparer.OrdinalIgnoreCase),
+                };
+            }
 
             public class SyncInfoV2_0
             {
-                public SyncStateV2_0 State;
                 public long LastVaultId = -1;
                 public string LocalPath = null;
-
+                public SyncStateV2_0 State;
                 public SynchronizationTree.SyncInfo UpgradeToLatest()
                 {
                     return new SynchronizationTree.SyncInfo { LastVaultId = LastVaultId, State = (SyncState) State, LocalPath = LocalPath };
                 }
             }
-
-            public Dictionary<string, SortedDictionary<string, SyncInfoV2_0>> Vaults = new Dictionary<string, SortedDictionary<string, SyncInfoV2_0>>(StringComparer.OrdinalIgnoreCase);
-            public string ConfigVersion = "2.0";
-            public bool OverwriteLocallyModifiedFiles = true;
-
-            public SynchronizationTree.VaultEagleConfig UpgradeToLatest(ConfigConversionContext context)
-            {
-                return new SynchronizationTree.VaultEagleConfig
-                    {
-                        Vaults = Vaults.ToDictionary(x => x.Key, x => x.Value.ToDictionary(kv => kv.Key, 
-                                        kv => kv.Value.UpgradeToLatest()).ToSortedDictionary(), StringComparer.OrdinalIgnoreCase),
-                    };
-            }
         }
-        public static IEnumerable<string> GetLines(TextReader reader)
-        {
-            using (reader)
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    yield return line;
-                }
-            }
-        }
-
     }
 }

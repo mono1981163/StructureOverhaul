@@ -29,16 +29,19 @@ namespace VaultEagle
     public interface IProgressWindow
     {
         void Log(string text, string detailed = null);
-        void LogWithProgress(string text, int progress);
         void LogDone(Boolean failed = false);
+
+        void LogWithProgress(string text, int progress);
         void Show();
     }
 
     public interface ISysTrayNotifyIconService
     {
-        void Start();
         void ShowIfSlow(string s);
+
         void ShowNow(string s, bool ignoreMinimumDisplayTime = false);
+
+        void Start();
     }
 
     [Serializable]
@@ -57,12 +60,22 @@ namespace VaultEagle
 
     public class VaultEagleSynchronizer
     {
-        public static void GetVersion(System.Reflection.Assembly executingAssembly, out string company, out string product, out Version version)
-        {
-            company = executingAssembly.GetAssemblyAttribute<System.Reflection.AssemblyCompanyAttribute>().Company;
-            product = executingAssembly.GetAssemblyAttribute<System.Reflection.AssemblyProductAttribute>().Product;
-            version = executingAssembly.GetName().Version;
-        }
+        public Connection connection;
+
+        public bool dontUpdateConfig;
+
+        public List<string> errors = new List<string>();
+
+        public List<string> failedDownloads = new List<string>();
+
+        //   private ToastNotificationManager
+        public IProgressWindow logWindow;
+
+        public StopThreadSwitch StopThread = new StopThreadSwitch();
+
+        public ISysTrayNotifyIconService sysTray;
+
+        private SynchronizationTree syncTree;
 
         public VaultEagleSynchronizer(Connection connection)
             : this(connection, SynchronizationTree.ReadTree(connection.Vault, connection.Server))
@@ -75,27 +88,37 @@ namespace VaultEagle
             this.syncTree = syncTree;
         }
 
-     //   private ToastNotificationManager
-        public IProgressWindow logWindow;
-        public ISysTrayNotifyIconService sysTray;
-        public Connection connection;
-        public bool dontUpdateConfig;
-        private SynchronizationTree syncTree;
+        public static void GetVersion(System.Reflection.Assembly executingAssembly, out string company, out string product, out Version version)
+        {
+            company = executingAssembly.GetAssemblyAttribute<System.Reflection.AssemblyCompanyAttribute>().Company;
+            product = executingAssembly.GetAssemblyAttribute<System.Reflection.AssemblyProductAttribute>().Product;
+            version = executingAssembly.GetName().Version;
+        }
+        public static void LogVersion(IProgressWindow logger, System.Reflection.Assembly executingAssembly)
+        {
+            string company, product;
+            Version version;
+            GetVersion(executingAssembly, out company, out product, out version);
+
+            var shortVer = string.Format("{0} {1}.{2} running...", product, version.Major, version.Minor);
+            var longVer = string.Format("{0} {1} running...", product, version.ToString());
+            logger.Log(shortVer, longVer);
+        }
+
+        public IEnumerable<VaultEagleLib.Model.DataStructures.DownloadItem/*FileFolder*/> GetBatch(int pageNumber, List<VaultEagleLib.Model.DataStructures.DownloadItem> files, int batchSize)
+        {
+            return files.Skip(pageNumber * batchSize).Take(batchSize);
+        }
 
         public void StopCheck()
         {
             if (StopThread.ShouldStop)
                 throw new StopThreadException();
         }
-
-        public StopThreadSwitch StopThread = new StopThreadSwitch();
-        public List<string> errors = new List<string>();
-        public List<string> failedDownloads = new List<string>();
-
         public void Synchronize()
         {
 #if DEBUG
-                        var watch = System.Diagnostics.Stopwatch.StartNew();
+            var watch = System.Diagnostics.Stopwatch.StartNew();
 #endif
             System.Diagnostics.Debug.WriteLine("SynchronizationThread.Run()");
             StopCheck();
@@ -147,7 +170,7 @@ namespace VaultEagle
                 //}
 
 #if DEBUG
-                            logWindow.Log("Time elapsed " + watch.ElapsedMilliseconds + "ms");
+                logWindow.Log("Time elapsed " + watch.ElapsedMilliseconds + "ms");
 #endif
 
                 logWindow.Log("");
@@ -300,18 +323,6 @@ namespace VaultEagle
                     logWindow.Log(error);
             }
         }
-
-        public static void LogVersion(IProgressWindow logger, System.Reflection.Assembly executingAssembly)
-        {
-            string company, product;
-            Version version;
-            GetVersion(executingAssembly, out company, out product, out version);
-
-            var shortVer = string.Format("{0} {1}.{2} running...", product, version.Major, version.Minor);
-            var longVer = string.Format("{0} {1} running...", product, version.ToString());
-            logger.Log(shortVer, longVer);
-        }
-
         /**********************************************************************************************************************/
         public List<Tuple<string, string>> Synchronize(string configPath, int networkRetries, string synchronizerConfigurationPath, bool useNotification, Option<MCADCommon.LogCommon.DisposableFileLogger> logger, ref Option<string> mailFrom)
         {
@@ -355,8 +366,8 @@ namespace VaultEagle
                     disposeLog = true;
                 }
 
-             //   Option<Logg
-              //  if (configuration.LogFile.IsSome)
+                //   Option<Logg
+                //  if (configuration.LogFile.IsSome)
                 logger.IfSomeDo(l => l.Info("Synchronizing vault files."));
 
                 // Fetch files to sync, mail on failure.
@@ -374,7 +385,7 @@ namespace VaultEagle
                 string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
                 logger.IfSomeDo(l => l.Info("Synchronizing: " + filesToUpdate.Count + " files."));
-                  //  if (filesToUpdate.Count > 0)
+                //  if (filesToUpdate.Count > 0)
                 {
                     trayIcon.Text = "Downloaded 0 of " + filesToUpdate.Count + " files.";
                     
@@ -385,7 +396,7 @@ namespace VaultEagle
                         List<VaultEagleLib.Model.DataStructures.DownloadFile> downloadedFiles = filesToUpdate.OfType<VaultEagleLib.Model.DataStructures.DownloadFile>().ToList();
                         foreach (string getAndRun in configuration.GetAndRun)
                         {
-                                // string test1 = filesToUpdate[filesToUpdate.Count - 1].Item2.Replace(configuration.VaultRoot, "$").Replace("\\", "/") + "/" + filesToUpdate[filesToUpdate.Count - 1].Item1.Name;
+                            // string test1 = filesToUpdate[filesToUpdate.Count - 1].Item2.Replace(configuration.VaultRoot, "$").Replace("\\", "/") + "/" + filesToUpdate[filesToUpdate.Count - 1].Item1.Name;
                             if (downloadedFiles.Any(f => getAndRun.Equals(f.VaultFileName(configuration.VaultRoot))))
                             {
                                 VaultEagleLib.Model.DataStructures.DownloadFile file = downloadedFiles.Where(f => getAndRun.Equals(f.VaultFileName(configuration.VaultRoot))).First();
@@ -449,63 +460,13 @@ namespace VaultEagle
 
             return filesToMove;
         }
-
-        public IEnumerable<VaultEagleLib.Model.DataStructures.DownloadItem/*FileFolder*/> GetBatch(int pageNumber, List<VaultEagleLib.Model.DataStructures.DownloadItem> files, int batchSize)
-        {
-            return files.Skip(pageNumber * batchSize).Take(batchSize);
-        }
-
-        private List<string> SynchronizeFiles(int networkRetries, Option<MCADCommon.LogCommon.DisposableFileLogger> logger, List<string> errors, VaultEagleLib.SynchronizerSettings configuration, List<VaultEagleLib.Model.DataStructures.DownloadItem> filesAndFoldersToUpdate, NotifyIcon notify)
-        {
-            List<string> failedFiles = new List<string>();
-            if (filesAndFoldersToUpdate.Count > 0)
-            {
-                int batchSize = 1000;
-                int maxPageNumber = Convert.ToInt32(Math.Floor(filesAndFoldersToUpdate.Count / (batchSize + 0.0)));
-                for (int i = 0; i <= maxPageNumber; i++)
-                {
-                    IEnumerable<VaultEagleLib.Model.DataStructures.DownloadItem> filesToSynchronize = GetBatch(i, filesAndFoldersToUpdate, batchSize);
-                    logger.IfSomeDo(l => l.Trace("Fetched: " + filesToSynchronize.Count() + " files to download."));
-
-                    failedFiles.AddRange(SynchronizeFileBatches(filesToSynchronize.ToList(), configuration.Items.ToArray(), logger, networkRetries));
-
-                    notify.Text = "downloaded " + (i * batchSize).ToString() + " of " + filesAndFoldersToUpdate.Count + " files.";// +" synchronized files of " + filesAndFoldersToUpdate.Count.ToString() + ".";
-                    logger.IfSomeDo(l => l.Info(filesToSynchronize.Count() + " files downloaded."));
-                }
-            }
-            foreach (VaultEagleLib.SynchronizationItem item in configuration.Items)
-            {
-                item.DeleteFiles(configuration.VaultRoot, networkRetries);
-                item.MirrorFolders(configuration.VaultRoot, networkRetries);
-                item.RunFiles(configuration.VaultRoot, filesAndFoldersToUpdate.OfType<VaultEagleLib.Model.DataStructures.DownloadFile>().ToList(), networkRetries);
-                item.CreateEmptyFolders(configuration.VaultRoot, networkRetries);
-            }
-            return failedFiles;
-        }
-
-        /*********************************************************************************************/
-        private List<string> SynchronizeFileBatches(List<VaultEagleLib.Model.DataStructures.DownloadItem> fileFolders, VaultEagleLib.SynchronizationItem[] items, Option<MCADCommon.LogCommon.DisposableFileLogger> logger, int retries)
-        {
-            // foreach (VaultEagleLib.SynchronizationItem item in items)
-            //   item.HandleLockedFiles(fileFolders, retries, logger);
-
-            List<VaultEagleLib.Model.DataStructures.DownloadFolder> folders = fileFolders.OfType<VaultEagleLib.Model.DataStructures.DownloadFolder>().ToList();//Where(f => f.Item1 == null).ToList();
-            foreach (VaultEagleLib.Model.DataStructures.DownloadFolder folder in folders)
-            {
-                if (!VaultEagle.VaultUtils.HandleNetworkErrors(() => Directory.Exists(folder.DownloadPath), retries))
-                    VaultEagle.VaultUtils.HandleNetworkErrors(() => Directory.CreateDirectory(folder.DownloadPath), retries);
-            }
-            return VaultCommunication.DownloadFilesWithChecksum(connection, fileFolders.OfType<VaultEagleLib.Model.DataStructures.DownloadFile>().ToList(), logger, retries);
-        }
-
-        /*********************************************************************************************/
         private Option<ADSK.File> DownloadConfiguration(string configPath, int networkRetries, string synchronizerConfigurationPath, Option<MCADCommon.LogCommon.DisposableFileLogger> logger, List<string> errors)
         {
             ADSK.File[] configurationFiles = connection.WebServiceManager.DocumentService.FindLatestFilesByPaths(new String[] { synchronizerConfigurationPath });
             Option<ADSK.File> configurationFile = Option.None;
             if (configurationFiles.Count() > 0)
             {
-                VaultCommunication.DownloadFilesWithChecksum(connection, new List<VaultEagleLib.Model.DataStructures.DownloadFile>(){ new VaultEagleLib.Model.DataStructures.DownloadFile(configurationFiles[0], configPath, false, false)}, logger, networkRetries);/*MCADCommon.VaultCommon.FileOperations.DownloadFile(connection, configurationFiles[0], path: configPath);*/
+                VaultCommunication.DownloadFilesWithChecksum(connection, new List<VaultEagleLib.Model.DataStructures.DownloadFile>() { new VaultEagleLib.Model.DataStructures.DownloadFile(configurationFiles[0], configPath, false, false) }, logger, networkRetries);/*MCADCommon.VaultCommon.FileOperations.DownloadFile(connection, configurationFiles[0], path: configPath);*/
                 if (VaultUtils.HandleNetworkErrors(() => !System.IO.File.Exists(Path.Combine(configPath, configurationFiles[0].Name)), networkRetries))
                 {
                     logger.IfSomeDo(l => l.Error("Failed to download configuration file."));
@@ -532,16 +493,6 @@ namespace VaultEagle
             return configurationFile;
         }
 
-        /***********************************************************************************************************************/
-        private bool IsFileInServerLocalFolder(FileFolder fileFolder, string localPath)
-        {
-            string serverName = VaultUtils.GetServerName(localPath);
-            
-            return fileFolder.Folder.FullName.StartsWith("$/LocalDesign/" + serverName + "/", StringComparison.InvariantCultureIgnoreCase);
-        }
-
-
-        /***********************************************************************************************************************/
         private List</*Tuple<ADSK.File, string, bool, bool>*/VaultEagleLib.Model.DataStructures.DownloadItem> FindFilesChangedSinceLastSync(VDF.Vault.Currency.Connections.Connection connection, bool useLastSyncTime, DateTime lastSyncTime, string vaultRoot, int retries, NotifyIcon trayIcon, VaultEagleLib.SynchronizationItem[] items, Option<MCADCommon.LogCommon.DisposableFileLogger> logger)
         {
             string lastSyncTag = lastSyncTime.ToUniversalTime().ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
@@ -569,7 +520,7 @@ namespace VaultEagle
                 {
                     Option<Folder> folder = Option.None;
                     Option<string> fileName = Option.None;
-                    
+
                     if (!System.IO.Path.HasExtension(item.SearchPath))
                     {
                         try
@@ -579,7 +530,8 @@ namespace VaultEagle
                         catch { }
                     }
                     else
-                    {try
+                    {
+                        try
                         {
                             if (item.SearchPath.Contains('.'))
                             {
@@ -630,7 +582,7 @@ namespace VaultEagle
                             //**********************************************************************************************/
                             if (item.GetChildren)
                             {
-                                
+
                                 foreach (FileFolder ff in results)
                                 {
                                     foreach (ADSK.File childFile in MCADCommon.VaultCommon.FileOperations.GetAllChildren(ff.File.MasterId, new List<ADSK.File>(), connection))
@@ -640,10 +592,10 @@ namespace VaultEagle
                                         child.File = childFile;
                                         child.Folder = connection.WebServiceManager.DocumentService.GetFolderById(childFile.FolderId);
                                         allChildren.Add(child);
-                                        Checked.Add((child.Folder.FullName+"/"+child.File.Name).ToLower());
+                                        Checked.Add((child.Folder.FullName + "/" + child.File.Name).ToLower());
                                     }
-                                 }
-                                    
+                                }
+
                             }
 
                             //***************************************************************************************************/
@@ -679,13 +631,13 @@ namespace VaultEagle
 
                         if (item.PatternsToSynchronize.Contains("/"))
                             filesToDownload.AddRange(item.GetFoldersAndPathsForItem(folders, vaultRoot));
-                        
+
                         if (item.Mirrors.Count() > 0)
                             item.AddMirrorFolders(folders);
 
                         i++;
-                        trayIcon.Text = i+ " of " + items.Count() + " download items checked.";
-                       // Console.WriteLine(i);
+                        trayIcon.Text = i + " of " + items.Count() + " download items checked.";
+                        // Console.WriteLine(i);
                     }
                     else
                     {
@@ -696,7 +648,7 @@ namespace VaultEagle
                 {
                     logger.IfSomeDo(l => l.Error("Error with synchronization item: " + ex.Message + "."));
                 }
-                
+
 
             }
             //List<Tuple<ADSK.File, string, bool, bool>> filesAndPathsToDl = new List<Tuple<ADSK.File, string, bool, bool>>();
@@ -710,5 +662,59 @@ namespace VaultEagle
 
             return /*removeExcludedPaths*/filesToDl;//filesAndPathsToDl;
         }
+
+        private bool IsFileInServerLocalFolder(FileFolder fileFolder, string localPath)
+        {
+            string serverName = VaultUtils.GetServerName(localPath);
+
+            return fileFolder.Folder.FullName.StartsWith("$/LocalDesign/" + serverName + "/", StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        private List<string> SynchronizeFileBatches(List<VaultEagleLib.Model.DataStructures.DownloadItem> fileFolders, VaultEagleLib.SynchronizationItem[] items, Option<MCADCommon.LogCommon.DisposableFileLogger> logger, int retries)
+        {
+            // foreach (VaultEagleLib.SynchronizationItem item in items)
+            //   item.HandleLockedFiles(fileFolders, retries, logger);
+
+            List<VaultEagleLib.Model.DataStructures.DownloadFolder> folders = fileFolders.OfType<VaultEagleLib.Model.DataStructures.DownloadFolder>().ToList();//Where(f => f.Item1 == null).ToList();
+            foreach (VaultEagleLib.Model.DataStructures.DownloadFolder folder in folders)
+            {
+                if (!VaultEagle.VaultUtils.HandleNetworkErrors(() => Directory.Exists(folder.DownloadPath), retries))
+                    VaultEagle.VaultUtils.HandleNetworkErrors(() => Directory.CreateDirectory(folder.DownloadPath), retries);
+            }
+            return VaultCommunication.DownloadFilesWithChecksum(connection, fileFolders.OfType<VaultEagleLib.Model.DataStructures.DownloadFile>().ToList(), logger, retries);
+        }
+
+        private List<string> SynchronizeFiles(int networkRetries, Option<MCADCommon.LogCommon.DisposableFileLogger> logger, List<string> errors, VaultEagleLib.SynchronizerSettings configuration, List<VaultEagleLib.Model.DataStructures.DownloadItem> filesAndFoldersToUpdate, NotifyIcon notify)
+        {
+            List<string> failedFiles = new List<string>();
+            if (filesAndFoldersToUpdate.Count > 0)
+            {
+                int batchSize = 1000;
+                int maxPageNumber = Convert.ToInt32(Math.Floor(filesAndFoldersToUpdate.Count / (batchSize + 0.0)));
+                for (int i = 0; i <= maxPageNumber; i++)
+                {
+                    IEnumerable<VaultEagleLib.Model.DataStructures.DownloadItem> filesToSynchronize = GetBatch(i, filesAndFoldersToUpdate, batchSize);
+                    logger.IfSomeDo(l => l.Trace("Fetched: " + filesToSynchronize.Count() + " files to download."));
+
+                    failedFiles.AddRange(SynchronizeFileBatches(filesToSynchronize.ToList(), configuration.Items.ToArray(), logger, networkRetries));
+
+                    notify.Text = "downloaded " + (i * batchSize).ToString() + " of " + filesAndFoldersToUpdate.Count + " files.";// +" synchronized files of " + filesAndFoldersToUpdate.Count.ToString() + ".";
+                    logger.IfSomeDo(l => l.Info(filesToSynchronize.Count() + " files downloaded."));
+                }
+            }
+            foreach (VaultEagleLib.SynchronizationItem item in configuration.Items)
+            {
+                item.DeleteFiles(configuration.VaultRoot, networkRetries);
+                item.MirrorFolders(configuration.VaultRoot, networkRetries);
+                item.RunFiles(configuration.VaultRoot, filesAndFoldersToUpdate.OfType<VaultEagleLib.Model.DataStructures.DownloadFile>().ToList(), networkRetries);
+                item.CreateEmptyFolders(configuration.VaultRoot, networkRetries);
+            }
+            return failedFiles;
+        }
+
+        /*********************************************************************************************/
+        /*********************************************************************************************/
+        /***********************************************************************************************************************/
+        /***********************************************************************************************************************/
     }
 }
