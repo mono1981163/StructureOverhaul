@@ -18,92 +18,13 @@ using System.Globalization;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using static VaultEagleConsole.ServerUtils;
 
 namespace VaultEagleConsole
 {
-    public class DummyProgressReporter : IProgressWindow
-    {
-        public void Log(string text, string detailed) { }
-        public void LogWithProgress(string text, int progress) { }
-        public void LogDone(bool failed) { }
-        public void Show() { }
-    }
     
-    public class DummySysTrayNotifyIconService : ISysTrayNotifyIconService
-    {
-        public void Start() { }
-        public void ShowIfSlow(string s) { }
-        public void ShowNow(string s, bool ignoreMinimumDisplayTime) { }
-    }
-
-    public class ConsoleProgressReporter : IProgressWindow
-    {
-        public void Log(string text, string detailed)
-        {
-            lock (this)
-            {
-                if (detailed == null)
-                    Console.WriteLine(text);
-                else
-                    Console.WriteLine(detailed);
-            }
-        }
-
-        public void LogWithProgress(string text, int progress)
-        {
-            lock (this)
-            {
-                if (text != null)
-                    Console.WriteLine("{0} ({1}%)", text, progress);
-            }
-        }
-
-        public void LogDone(bool failed) { }
-        public void Show() { }
-    }
-
     class Program
     {
-        // return - true : one of server is valid or ServerList is empty, false : no server is valid
-        private static bool CheckServers(List<string> ServerList)
-        {
-            if (ServerList.Count == 0)
-                return true;
-
-            List<string> serverList = ServerList;
-            List<Task<PingReply>> pingTasks = new List<Task<PingReply>>();
-            foreach (var server in serverList)
-            {
-                pingTasks.Add(PingAsync(server));
-            }
-
-            Task.WaitAll(pingTasks.ToArray());
-
-            foreach (var pingTask in pingTasks)
-            {
-                if (pingTask.Result != null)
-                {
-                    return true;
-                }
-
-            }
-
-            return false;
-        }
-
-        // return - response from url
-        static Task<PingReply> PingAsync(string address)
-        {
-            var tcs = new TaskCompletionSource<PingReply>();
-            Ping ping = new Ping();
-            ping.PingCompleted += (obj, sender) =>
-            {
-                tcs.SetResult(sender.Reply);
-            };
-            ping.SendAsync(address, new object());
-            return tcs.Task;
-        }
-
         static int Main(string[] args)
         {
 /*#if DEBUG
@@ -207,7 +128,7 @@ namespace VaultEagleConsole
                             v =>
                                 {
                                     retry = true;
-                                    retryDelay = ParseTimeSpan(v);
+                                    retryDelay = FileUtils.ParseTimeSpan(v);
                                 }
                         },
                         {
@@ -257,7 +178,7 @@ namespace VaultEagleConsole
 
                         var url = extra.OptionSingle();
                         if (url.IsSome)
-                            ParseVaultUrl(url.Get(), ref userName, ref password, ref serverName, ref vaultName, ref path);
+                            ServerUtils.ParseVaultUrl(url.Get(), ref userName, ref password, ref serverName, ref vaultName, ref path);
                         else if (extra.Any())
                             showHelpAndExit = true;
 
@@ -281,7 +202,7 @@ namespace VaultEagleConsole
                     var connectionManager = Autodesk.DataManagement.Client.Framework.Vault.Library.ConnectionManager;
                     if (showHelpAndExit)
                     {
-                        ShowHelp(p);
+                        FileUtils.ShowHelp(p);
                         return 1;
                     }
                     IProgressWindow logger = new ConsoleProgressReporter();
@@ -305,7 +226,7 @@ namespace VaultEagleConsole
                         ApplicationSettings settings = ApplicationSettings.Read();
                         List<Tuple<string, string>> filesToMove = new List<Tuple<string, string>>();
 
-                        bool serverCheckResult = CheckServers(settings.ServerList);
+                        bool serverCheckResult = ServerUtils.CheckServers(settings.ServerList);
                        
                         if (serverCheckResult && (!String.IsNullOrWhiteSpace(serverName) && !String.IsNullOrWhiteSpace(vaultName)) && ((!String.IsNullOrWhiteSpace(userName)) || (useWindowsAuth)))
                         {
@@ -328,7 +249,7 @@ namespace VaultEagleConsole
                                 {
                                     fileLogger = new MCADCommon.LogCommon.DisposableFileLogger(MCADCommon.LogCommon.DisposableFileLogger.CreateLogFilePath(settings.configPath, logName), settings.LogLevel.Get()).AsOption();
                                 
-                                    RemoveOldLogFiles(settings.configPath, logName, settings.SavedLogCount);
+                                    FileUtils.RemoveOldLogFiles(settings.configPath, logName, settings.SavedLogCount);
                                 }
 
                                 //  using (MCADCommon.LogCommon.DisposableFileLogger logger2 = new MCADCommon.LogCommon.DisposableFileLogger(MCADCommon.LogCommon.DisposableFileLogger.CreateLogFilePath(settings.configPath, logName), settings.LogLevel))
@@ -372,6 +293,7 @@ namespace VaultEagleConsole
 
                                     var connection = result.Connection;
                                     List<string> logErrorList = new List<string>();
+                                    // synchronize with server
                                     try
                                     {
                                         Option<string> mailSender = Option.None;
@@ -453,8 +375,6 @@ namespace VaultEagleConsole
                                                 mailer.Mail(mailTitle, mailBody, new List<string> { fileLogger.Get().getLogFilePath() });
                                             }
                                         }
-
-
                                         else if (settings.MailLog.EqualsIgnoreCase("Always") && fileLogger.IsSome)
                                         {
                                             if (settings.MailInfo.IsSome)
@@ -556,7 +476,7 @@ namespace VaultEagleConsole
                             }
                         };
                     }
-                    DoWithRetry(logger, execute, retry ? retries : 0, retryDelay.ToNullable());
+                    ServerUtils.DoWithRetry(logger, execute, retry ? retries : 0, retryDelay.ToNullable());
 
                     return 0;
                 }
@@ -581,171 +501,6 @@ namespace VaultEagleConsole
                 }
 #endif*/
         }
-
-        private static void RemoveOldLogFiles(string path, string logFileName, int allowedOldLogs)
-        {
-            List<FileInfo> oldLogFiles = new List<FileInfo>();
-            foreach (FileInfo fileInLogPath in new DirectoryInfo(path).GetFiles())
-                if (fileInLogPath.Name.StartsWith(logFileName))
-                    oldLogFiles.Add(fileInLogPath);
-
-            oldLogFiles.OrderBy(fileInfo => ParseLogTime(fileInfo.Name, logFileName,"yyyy-MM-dd HH-mm-ss"));
-
-            while (oldLogFiles.Count >= allowedOldLogs)
-            {
-                FileInfo oldestLogFile = oldLogFiles.First();
-                oldLogFiles.Remove(oldestLogFile);
-                using (FileAttributeHandler attributeHandler = new FileAttributeHandler(oldestLogFile.FullName))
-                    System.IO.File.Delete(oldestLogFile.FullName);
-            }
-        }
-
-        class FileAttributeHandler : IDisposable
-        {
-            private FileAttributes Attributes;
-            private string Path = null;
-
-            public FileAttributeHandler(string path)
-            {
-                if (System.IO.File.Exists(path))
-                {
-                    Path = path;
-                    Attributes = System.IO.File.GetAttributes(path);
-                    System.IO.File.SetAttributes(path, FileAttributes.Normal);
-                }
-            }
-            public void Dispose()
-            {
-                if (Path != null && System.IO.File.Exists(Path))
-                    System.IO.File.SetAttributes(Path, Attributes);
-            }
-        }
-
-        private static DateTime ParseLogTime(string logFileName, string logName,string parseString)
-        {
-            string dateTimeText = logFileName.Substring(logName.Length + 1, 19);
-            return DateTime.ParseExact(dateTimeText, parseString, new CultureInfo("en-US"));
-        }
-        private static Option<TimeSpan> ParseTimeSpan(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s))
-                return Option.None;
-            if(System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*s?$"))
-                return s.TrimStringAtEnd("s").Trim().OptionParseDouble().Transform(TimeSpan.FromSeconds);
-            if(System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*(m|min)$"))
-                return s.TrimStringAtEnd("min").TrimStringAtEnd("m").Trim().OptionParseDouble().Transform(TimeSpan.FromMinutes);
-            if(System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*h$"))
-                return s.TrimStringAtEnd("h").Trim().OptionParseDouble().Transform(TimeSpan.FromHours);
-            return Option.None;
-        }
-
-        static void ShowHelp(OptionSet p)
-        {
-            Console.WriteLine("Usage: VaultEagleConsole [OPTIONS]+ USER:PASS@SERVER/VAULT[/$/VAULTPATH/]");
-            Console.WriteLine("Vault Eagle updates subscribed files from Vault. It checks if files are up to date");
-            Console.WriteLine();
-            Console.WriteLine("Options:");
-            p.WriteOptionDescriptions(Console.Out);
-        }
         
-        private static void ParseVaultUrl(string vaultUrl, ref string user, ref string pass, ref string server, ref string vault, ref string path)
-        {
-            try
-            {
-                
-                if (!string.IsNullOrEmpty(vaultUrl))
-                {
-                    Uri sourceUri;
-                    if (vaultUrl.Contains("://"))
-                        sourceUri = new Uri(vaultUrl);
-                    else
-                        sourceUri = new Uri("http://" + vaultUrl);
-
-                    if (!string.IsNullOrEmpty(sourceUri.UserInfo))
-                    {
-                        string userInfo = sourceUri.UserInfo;
-                        if (userInfo.Contains(":"))
-                        {
-                            var split = userInfo.Split(new[] { ':' }, 2, StringSplitOptions.None);
-                            SetIfNotNullOrEmpty(ref user, split[0]);
-                            pass = split[1]; // can be String.Empty
-                        }
-                        else
-                            SetIfNotNullOrEmpty(ref user, userInfo);
-                    }
-
-                    SetIfNotNullOrEmpty(ref server, sourceUri.Host);
-
-                    var absolutePath = sourceUri.AbsolutePath;
-                    // "/Vault2/$/Designs" => {"", "Vault2", "$/Designs"}
-                    var split2 = absolutePath.Split(new[] { '/' }, 3, StringSplitOptions.None);
-                    if (split2.Length > 1)
-                        SetIfNotNullOrEmpty(ref vault, split2[1]);
-                    if (split2.Length > 2)
-                        SetIfNotNullOrEmpty(ref path, split2[2]);
-                }
-            }
-            catch (UriFormatException)
-            {
-                //Print("Couldn't parse: " + vaultUrl, "Error");
-                //PrintUsageAndExit();
-                throw new Exception("Couldn't parse: " + vaultUrl);
-            }
-        }
-
-        private static void SetIfNotNullOrEmpty(ref string target, string s)
-        {
-            if (!string.IsNullOrEmpty(s))
-                target = Uri.UnescapeDataString(s);
-        }
-
-        public class DoNotRetry { }
-
-        private static void DoWithRetry(IProgressWindow logger, Action action, int numberOfRetries, TimeSpan? retryDelay)
-        {
-            var retryDelayInSecondsSchedule =
-                retryDelay.HasValue
-                    ? new[] {retryDelay.Value}.Cycle()
-                    : new[]
-                        {
-                            10,
-                            30,
-                            60,
-                            5*60,
-                            10*60,
-                            15*60,
-                            60*60,
-                            2*60*60,
-                        }.Concat(new[] {2*60*60}.Cycle())
-                         .Select(x => TimeSpan.FromSeconds(x));
-
-            foreach (var delay in retryDelayInSecondsSchedule.Take(numberOfRetries))
-            {
-                try
-                {
-                    action();
-                    return;
-                }
-                catch (SimpleException<DoNotRetry> ex)
-                {
-                    if(ex.InnerException != null)
-                        throw ex.InnerException;
-                    throw new ErrorMessageException(ex.Message);
-                }
-                catch (ErrorMessageException ex)
-                {
-                    logger.Log("Error: " + ex.Message);
-                    logger.Log("Waiting to retry... (" + delay.ToPrettyFormat() + ")");
-                    System.Threading.Thread.Sleep(delay);
-                }
-                catch (Exception ex)
-                {
-                    logger.Log(VaultServerException.WrapException(ex).ToString());
-                    logger.Log("Waiting to retry... (" + delay.ToPrettyFormat() + ")");
-                    System.Threading.Thread.Sleep(delay);
-                }
-            }
-            action();
-        }
     }
 }
