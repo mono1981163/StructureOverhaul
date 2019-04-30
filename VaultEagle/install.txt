@@ -1,0 +1,11 @@
+﻿VaultEagle
+**********
+
+Run the VaultEagleInstall.msi to install the program files.
+
+After that the configuration file has to be created:
+C:\Users\mbk\AppData\Local\MCAD\VaultEagle\vaulteagle.tree.config
+
+En example of this config-file is included.
+
+Any logs from the working of VaultEagle is placed in the same directory as the configuration file.

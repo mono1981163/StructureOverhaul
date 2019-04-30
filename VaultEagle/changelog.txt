@@ -1,0 +1,27 @@
+﻿VaultEagle
+**********
+
+The program is supposed to keep a set of local files up to date with the latest files from Vault.
+
+What should be kept updated is configured here (on Windows 7):
+C:\Users\[Username]\AppData\Local\MCAD\VaultEagle\vaulteagle.tree.config
+
+Version 1.0.0 (20120216 mbk)
+=============
+* First version
+
+Version 1.1.0
+=============
+* Added a dialog to visualize subscriptions
+* Added vault client integration to subscribe/unsubscribe from files and folders
+
+Version 1.2
+===========
+* 2017 version
+
+1.3
+===
+* 2018 version
+
+
+
