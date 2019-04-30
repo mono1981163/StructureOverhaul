@@ -4,42 +4,12 @@ using System.Linq;
 using System.Windows.Forms;
 
 using Common.DotNet.Extensions;
+using Common.DotNet.Extensions.Winforms;
 
 namespace VaultEagle
 {
-    public static class WinformsExtensionMethods
-    {
-        public static IEnumerable<TreeNode> AsEnumerable(this TreeNodeCollection nodes)
-        {
-            return nodes.Cast<TreeNode>();
-        }
 
-        public static void DoThreadSafeSynchronous(this Control control, Action action)
-        {
-            if (control.InvokeRequired)
-                control.Invoke(action);
-            else
-                action();
-        }
-
-        public static TResult DoThreadSafeSynchronous<TResult>(this Control control, Func<TResult> func)
-        {
-            if (control.InvokeRequired)
-                return (TResult) control.Invoke(func);
-            else
-                return func();
-        }
-
-        public static void DoThreadSafeAsync(this Control control, Action action)
-        {
-            if (control.InvokeRequired)
-                control.BeginInvoke(action); // execute async, Control.BeginInvoke executes calls in-order, queuing items on the message-pump
-            else
-                action();
-        }
-    }
-
-    public static class SynchronizationTreeExtensionMethods
+    public static class SynchronizationTreeExtension
     {
         public static TreeNode ToTreeNode(this SynchronizationTree tree)
         {

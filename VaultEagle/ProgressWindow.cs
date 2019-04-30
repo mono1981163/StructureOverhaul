@@ -13,10 +13,9 @@ namespace VaultEagle
 {
     public partial class ProgressWindow : Form, IProgressWindow
     {
+        private Timer abortTimer;
         private Extension extension;
         private System.IO.StreamWriter logFileTextWriter;
-        private Timer abortTimer;
-        
         public ProgressWindow(Extension extension, string logFilePath = null)
         {
             this.extension = extension;
@@ -30,15 +29,18 @@ namespace VaultEagle
             catch (Exception) { }
         }
 
+        public void DoThreadSafe(Action action)
+        {
+            if (InvokeRequired)
+                BeginInvoke(action); // execute async, Control.BeginInvoke executes calls in-order, queuing items on the message-pump
+            else
+                action();
+        }
+
         public void Initialize()
         {
             // bind control to ui thread even though it's not visible yet
             var dummy = Handle;
-        }
-
-        private void closeButton_Click(object sender, EventArgs e)
-        {
-            Hide();
         }
 
         public void Log(string text, string detailed = null)
@@ -52,23 +54,12 @@ namespace VaultEagle
                 if (logFileTextWriter != null)
                 {
                     string detailed2 = detailed.Replace("\r\n", "\n").Replace("\n", "\r\n");
-                    logFileTextWriter.WriteLine("["+DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss z") + "] " + detailed2);
+                    logFileTextWriter.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss z") + "] " + detailed2);
                     logFileTextWriter.Flush();
                 }
             });
         }
 
-        public void LogWithProgress(string text, int progress)
-        {
-            DoThreadSafe(() =>
-            {
-                if(text != null)
-                    Log(text);
-                progressBar1.Style = ProgressBarStyle.Blocks;
-                progressBar1.Value = progress;
-            });
-        }
-        
         public void LogDone(Boolean failed = false)
         {
             DoThreadSafe(() =>
@@ -85,9 +76,39 @@ namespace VaultEagle
             });
         }
 
+        public void LogWithProgress(string text, int progress)
+        {
+            DoThreadSafe(() =>
+            {
+                if (text != null)
+                    Log(text);
+                progressBar1.Style = ProgressBarStyle.Blocks;
+                progressBar1.Value = progress;
+            });
+        }
+
         public new void Show()
         {
             DoThreadSafe(base.Show);
+        }
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (components != null)
+                    components.Dispose();
+                if (logFileTextWriter != null)
+                {
+                    logFileTextWriter.Dispose();
+                    logFileTextWriter = null;
+                }
+            }
+            base.Dispose(disposing);
         }
 
         private void abortButton_Click(object sender, EventArgs e)
@@ -116,32 +137,9 @@ namespace VaultEagle
             progressBar1.Style = ProgressBarStyle.Blocks;
         }
 
-        public void DoThreadSafe(Action action)
+        private void closeButton_Click(object sender, EventArgs e)
         {
-            if (InvokeRequired)
-                BeginInvoke(action); // execute async, Control.BeginInvoke executes calls in-order, queuing items on the message-pump
-            else
-                action();
+            Hide();
         }
-
-        /// <summary>
-        /// Clean up any resources being used.
-        /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (components != null)
-                    components.Dispose();
-                if (logFileTextWriter != null)
-                {
-                    logFileTextWriter.Dispose();
-                    logFileTextWriter = null;
-                }
-            }
-            base.Dispose(disposing);
-        }
-
     }
 }

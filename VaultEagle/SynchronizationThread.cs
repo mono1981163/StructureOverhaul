@@ -20,14 +20,76 @@ using Common.DotNet.Extensions;
 
 namespace VaultEagle
 {
+    public class DisposableActionWrapper : IDisposable
+    {
+        public Action disposeAction;
+        public void Dispose()
+        {
+            if (disposeAction != null)
+                disposeAction();
+        }
+    }
+
+    public class OneShotStoppableTimer : IDisposable
+    {
+        public readonly object TimerRunningLock = new object();
+        private bool stopped;
+        private System.Threading.Timer timer;
+        public OneShotStoppableTimer(TimerCallback callback)
+        {
+            timer = new System.Threading.Timer(x =>
+            {
+                lock (TimerRunningLock)
+                {
+                    if (stopped)
+                        return;
+                    stopped = true;
+                    callback(x);
+                }
+            });
+        }
+
+        public void Dispose()
+        {
+            timer.DisposeUnlessNull(ref timer);
+        }
+
+        public void Start(long dueTime)
+        {
+            lock (TimerRunningLock)
+            {
+                if (stopped)
+                    return;
+                timer.Change(dueTime, Timeout.Infinite);
+            }
+        }
+
+        public void StopAndWait()
+        {
+            lock (TimerRunningLock)
+            {
+                if (stopped)
+                    return;
+                stopped = true;
+                timer.Change(Timeout.Infinite, Timeout.Infinite);
+            }
+        }
+
+        public bool Stopped()
+        {
+            lock (TimerRunningLock)
+            {
+                return stopped;
+            }
+        }
+    }
+
     public class SynchronizationThread
     {
-        Thread thread;
-
-        public ProgressWindow logWindow;
         public Control invokeControl;
+        public ProgressWindow logWindow;
         private VaultEagleSynchronizer synchronizer;
-
+        Thread thread;
         public SynchronizationThread(IApplication application, Control invokeControl)
         {
             thread = new Thread(Run);
@@ -51,6 +113,17 @@ namespace VaultEagle
             //if (thread.IsAlive)
             //    thread.Join();
             return thread;
+        }
+
+        private void HandleException(Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            logWindow.Log("Halted.");
+            logWindow.Log("Exception: " + ex.Message, detailed: "Exception: " + ex);
+            logWindow.LogDone(failed: true);
+            invokeControl.DoThreadSafeAsync(() =>
+                logWindow.Show()
+            );
         }
 
         private void Run()
@@ -108,112 +181,36 @@ namespace VaultEagle
                 // If we do, things are bad!
             }
         }
-
-        private void HandleException(Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine(ex);
-            logWindow.Log("Halted.");
-            logWindow.Log("Exception: " + ex.Message, detailed: "Exception: " + ex);
-            logWindow.LogDone(failed: true);
-            invokeControl.DoThreadSafeAsync(() =>
-                logWindow.Show()
-            );
-        }
     }
-
-    public class OneShotStoppableTimer : IDisposable
-    {
-        public readonly object TimerRunningLock = new object();
-        private System.Threading.Timer timer;
-        private bool stopped;
-
-        public OneShotStoppableTimer(TimerCallback callback)
-        {
-            timer = new System.Threading.Timer(x => 
-            {
-                lock (TimerRunningLock)
-                {
-                    if (stopped)
-                        return;
-                    stopped = true;
-                    callback(x);
-                }
-            });
-        }
-
-        public void Start(long dueTime)
-        {
-            lock(TimerRunningLock) {
-                if (stopped)
-                    return;
-                timer.Change(dueTime, Timeout.Infinite);
-            }
-        }
-
-        public void StopAndWait()
-        {
-            lock (TimerRunningLock)
-            {
-                if (stopped)
-                    return;
-                stopped = true;
-                timer.Change(Timeout.Infinite, Timeout.Infinite);
-            }
-        }
-
-        public bool Stopped()
-        {
-            lock (TimerRunningLock)
-            {
-                return stopped;
-            }
-        }
-
-        public void Dispose()
-        {
-            timer.DisposeUnlessNull(ref timer);
-        }
-    }
-
     public class SysTrayNotifyIconService : IDisposable, ISysTrayNotifyIconService
     {
         public static readonly int DISPLAY_DELAY = 4000;
         public static readonly int MIN_DISPLAY_TIME = 1000;
 
-        private NotifyIcon notifyIcon;
-        private Control invokeControl;
-        private int uiThreadNumActive = 0;
         private bool disposed = false;
-
-        private DateTime started;
+        private Control invokeControl;
         private DateTime lastShowed;
-        private OneShotStoppableTimer timer;
         private string nextMessage;
-
+        private NotifyIcon notifyIcon;
+        private DateTime started;
+        private OneShotStoppableTimer timer;
+        private int uiThreadNumActive = 0;
         public SysTrayNotifyIconService(Control invokeControl)
         {
             this.invokeControl = invokeControl;
         }
 
-        public void Start()
-        { 
-            started = DateTime.Now;
-        }
+        public event EventHandler BalloonTipClicked = delegate { };
 
-        private void StartTimer(string message, double dueTime)
+        public void Dispose()
         {
-            nextMessage = message;
-            timer = new OneShotStoppableTimer(TimerElapsed);
-            timer.Start((long)dueTime);
-        }
-
-        public void TimerElapsed(object o)
-        {
-            //lock (timer.TimerRunningLock) // already locked
-
-            ShowOnUIThread(nextMessage);
-
-            timer.DisposeUnlessNull(ref timer);
+            Action action = () =>
+                {
+                    disposed = true;
+                    if (uiThreadNumActive == 0)
+                        notifyIcon.DisposeUnlessNull(ref notifyIcon);
+                };
+            invokeControl.BeginInvoke(action);
         }
 
         public void ShowIfSlow(string s)
@@ -238,12 +235,6 @@ namespace VaultEagle
             }
         }
 
-        private void AddToNumActive(int k)
-        {
-            Action action = () => uiThreadNumActive += k;
-            invokeControl.BeginInvoke(action);
-        }
-
         public void ShowNow(string s, bool ignoreMinimumDisplayTime = false)
         {
             if (timer != null)
@@ -265,6 +256,26 @@ namespace VaultEagle
                 ShowOnUIThread(s);
         }
 
+        public void Start()
+        { 
+            started = DateTime.Now;
+        }
+
+        public void TimerElapsed(object o)
+        {
+            //lock (timer.TimerRunningLock) // already locked
+
+            ShowOnUIThread(nextMessage);
+
+            timer.DisposeUnlessNull(ref timer);
+        }
+
+        private void AddToNumActive(int k)
+        {
+            Action action = () => uiThreadNumActive += k;
+            invokeControl.BeginInvoke(action);
+        }
+
         private void ShowOnUIThread(string s)
         {
             lastShowed = DateTime.Now;
@@ -281,7 +292,8 @@ namespace VaultEagle
                         string STR_MCAD_Vault_Eagle_1_0___Workspace_Sync = "{0} {1} {2} - Workspace Sync";
                         string title = string.Format(STR_MCAD_Vault_Eagle_1_0___Workspace_Sync, company, product, shortVersion);
 
-                        notifyIcon = new NotifyIcon() {
+                        notifyIcon = new NotifyIcon()
+                        {
                             Text = title,
                             Icon = Properties.Resources.MCAD_,
                             BalloonTipIcon = ToolTipIcon.Info,
@@ -296,7 +308,7 @@ namespace VaultEagle
                         {
                             System.Diagnostics.Debug.WriteLine("notifyIcon.BalloonTipClosed");
                             uiThreadNumActive--;
-                            
+
                             if (disposed && uiThreadNumActive == 0)
                                 notifyIcon.DisposeUnlessNull(ref notifyIcon);
                         };
@@ -311,19 +323,12 @@ namespace VaultEagle
             invokeControl.BeginInvoke(action);
         }
 
-        public void Dispose()
+        private void StartTimer(string message, double dueTime)
         {
-            Action action = () =>
-                {
-                    disposed = true;
-                    if (uiThreadNumActive == 0)
-                        notifyIcon.DisposeUnlessNull(ref notifyIcon);
-                };
-            invokeControl.BeginInvoke(action);
+            nextMessage = message;
+            timer = new OneShotStoppableTimer(TimerElapsed);
+            timer.Start((long)dueTime);
         }
-
-        public event EventHandler BalloonTipClicked = delegate { };
-
         //// forward event
         //public event EventHandler BalloonTipClicked
         //{
@@ -331,15 +336,5 @@ namespace VaultEagle
         //    remove { notifyIcon.BalloonTipClicked -= value; }
         //}
 
-    }
-
-    public class DisposableActionWrapper : IDisposable
-    {
-        public Action disposeAction;
-        public void Dispose()
-        {
-            if (disposeAction != null)
-                disposeAction();
-        }
     }
 }

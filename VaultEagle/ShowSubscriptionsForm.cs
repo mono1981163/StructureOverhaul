@@ -12,10 +12,9 @@ namespace VaultEagle
 {
     partial class ShowSubscriptionsForm : Form
     {
-        private SynchronizationTree tree;
-        private Action<bool> startSyncThread;
         private readonly VaultCommunication vaultCom;
-
+        private Action<bool> startSyncThread;
+        private SynchronizationTree tree;
         public ShowSubscriptionsForm(SynchronizationTree tree, Action<bool> startSyncThread, VaultCommunication vaultCom)
         {
             this.tree = tree;
@@ -28,6 +27,98 @@ namespace VaultEagle
             removeToolStripMenuItem.ShortcutKeys = Keys.Delete;
             RedrawTree();
             SubscriptionTree.ExpandAll();
+        }
+
+        public static string GetPath(TreeNode n)
+        {
+            return n.Tag as string;
+        }
+
+        
+
+        private IEnumerable<TreeNode> GetAllNodes()
+        {
+            return SubscriptionTree.Nodes.AsEnumerable().SelectMany(root => GetAllNodes(root));
+        }
+
+        private IEnumerable<TreeNode> GetAllNodes(TreeNode root)
+        {
+            return TreeUtils.Flatten(root, n => n.Nodes.Cast<TreeNode>());
+        }
+
+        private void RedrawTree()
+        {
+            var expandedNodes = (from n in GetAllNodes()
+                                 where n.IsExpanded
+                                 select GetPath(n)).ToSet();
+
+            SubscriptionTree.Nodes.Clear();
+            SubscriptionTree.Nodes.Add(tree.ToTreeNode());
+            foreach (var node in GetAllNodes())
+                if (expandedNodes.Contains(GetPath(node)))
+                    node.Expand();
+        }
+
+        #region Event
+        private void cancelButton_Click(object sender, EventArgs e)
+        {
+            Close();
+        }
+
+        private void OKButton_Click(object sender, EventArgs e)
+        {
+            tree.WriteTree();
+            Close();
+        }
+        
+        private void removeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var root = SubscriptionTree.SelectedNode;
+            if (root == null)
+                return;
+
+            foreach (var node in GetAllNodes(root))
+            {
+                string path = GetPath(node);
+                if (path != null)
+                    tree.Reset(path);
+            }
+            RedrawTree();
+        }
+
+        private void repairButton_Click(object sender, EventArgs e)
+        {
+            var synchronizationTree = tree;
+            vaultCom.TryRepairSynchronizationTree(synchronizationTree);
+
+            RedrawTree();
+
+            HashSet<string> missingFolders;
+            HashSet<string> missingFiles;
+            vaultCom.UpdateLastVaultId(synchronizationTree, out missingFolders, out missingFiles);
+
+            foreach (var node in GetAllNodes())
+            {
+                string path = GetPath(node);
+                if (missingFolders.Contains(path))
+                    node.ImageIndex = (int)SynchronizationTree.ImageIndex.FolderError;
+                if (missingFiles.Contains(path))
+                    node.ImageIndex = (int)SynchronizationTree.ImageIndex.FileError;
+            }
+        }
+
+        private void showLogButton_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start(FilesAndFolders.GetLogPath());
+        }
+
+        private void SubscriptionTree_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyData == Keys.Delete)
+            {
+                removeToolStripMenuItem.PerformClick();
+                e.Handled = true;
+            }
         }
 
         private void SubscriptionTree_MouseUp(object sender, MouseEventArgs e)
@@ -92,6 +183,12 @@ namespace VaultEagle
             }
         }
 
+        private void syncNowButton_Click(object sender, EventArgs e)
+        {
+            tree.WriteTree();
+            startSyncThread(true);
+        }
+
         private void toolStripMenuItem_Click(object sender, EventArgs e)
         {
             treeContextMenuStrip.Close();
@@ -103,100 +200,6 @@ namespace VaultEagle
                 tree.SetState(path, syncState.Value);
             RedrawTree();
         }
-
-        private void removeToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var root = SubscriptionTree.SelectedNode;
-            if (root == null)
-                return;
-
-            foreach (var node in GetAllNodes(root))
-            {
-                string path = GetPath(node);
-                if(path != null)
-                    tree.Reset(path);
-            }
-            RedrawTree();
-        }
-
-        private void RedrawTree()
-        {
-            var expandedNodes = (from n in GetAllNodes() 
-                                 where n.IsExpanded
-                                 select GetPath(n)).ToSet();
-
-            SubscriptionTree.Nodes.Clear();
-            SubscriptionTree.Nodes.Add(tree.ToTreeNode());
-            foreach (var node in GetAllNodes())
-                if (expandedNodes.Contains(GetPath(node)))
-                    node.Expand();
-        }
-
-        public static string GetPath(TreeNode n)
-        {
-            return n.Tag as string;
-        }
-
-        private IEnumerable<TreeNode> GetAllNodes()
-        {
-            return SubscriptionTree.Nodes.AsEnumerable().SelectMany(root => GetAllNodes(root));
-        }
-
-        private IEnumerable<TreeNode> GetAllNodes(TreeNode root)
-        {
-            return TreeUtils.Flatten(root, n => n.Nodes.Cast<TreeNode>());
-        }
-
-        private void OKButton_Click(object sender, EventArgs e)
-        {
-            tree.WriteTree();
-            Close();
-        }
-
-        private void cancelButton_Click(object sender, EventArgs e)
-        {
-            Close();
-        }
-
-        private void syncNowButton_Click(object sender, EventArgs e)
-        {
-            tree.WriteTree();
-            startSyncThread(true);
-        }
-
-        private void SubscriptionTree_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyData == Keys.Delete)
-            {
-                removeToolStripMenuItem.PerformClick();
-                e.Handled = true;
-            }
-        }
-
-        private void showLogButton_Click(object sender, EventArgs e)
-        {
-            System.Diagnostics.Process.Start(FilesAndFolders.GetLogPath());
-        }
-
-        private void repairButton_Click(object sender, EventArgs e)
-        {
-            var synchronizationTree = tree;
-            vaultCom.TryRepairSynchronizationTree(synchronizationTree);
-
-            RedrawTree();
-
-            HashSet<string> missingFolders;
-            HashSet<string> missingFiles;
-            vaultCom.UpdateLastVaultId(synchronizationTree, out missingFolders, out missingFiles);
-
-            foreach (var node in GetAllNodes())
-            {
-                string path = GetPath(node);
-                if (missingFolders.Contains(path))
-                    node.ImageIndex = (int) SynchronizationTree.ImageIndex.FolderError;
-                if (missingFiles.Contains(path))
-                    node.ImageIndex = (int) SynchronizationTree.ImageIndex.FileError;
-            }
-        }
+        #endregion
     }
 }

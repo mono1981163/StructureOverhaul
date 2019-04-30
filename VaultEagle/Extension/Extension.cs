@@ -49,6 +49,61 @@ namespace VaultEagle
 #if DEBUG
 #endif
 
+        #region Event
+        public void OnLogOff(IApplication application)
+        {
+            // Careful. This is called before first login. And also where obvious just before shutdown.
+            System.Diagnostics.Debug.WriteLine("OnLogOff");
+        }
+
+        public void OnLogOn(IApplication application)
+        {
+            vaultCom = new VaultCommunication();
+            this.application = application;
+
+            invokeControl.DoThreadSafeAsync(() =>
+            {
+                if (application.Connection != null)
+                {
+                    InitializeFromConnectionOnLogon();
+                }
+                else
+                {
+                    CallInitializeLater();
+                }
+            });
+        }
+
+        public void OnShutdown(IApplication application)
+        {
+            if (thread != null)
+            {
+                thread.Stop();
+                thread = null;
+            }
+        }
+
+        public void OnStartup(IApplication application)
+        {
+            CreateInvokeControl();
+            System.Diagnostics.Debug.WriteLine("OnStartup");
+
+            // deletes Menus.xml after install, so our commands appear in the Main Menu
+            string[] commandsToLookFor =
+            {
+            STR_MSAB_ShowSubscriptionCommand,
+#if DEBUG
+            STR_MSAB_RunTests,
+#endif
+            };
+
+#if DEBUG
+            _ExtensionHookForTests = this;
+#endif
+        }
+        #endregion
+
+        #region Method
         //    string pluginRoot = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
         //    string assemblyPath = Path.Combine(pluginRoot, "VaultEagleTests.dll");
         //    new NUnitLite.Runner.TextUI(sw).Execute(new string[] { assemblyPath, "-out=" + tempfile });
@@ -194,58 +249,6 @@ namespace VaultEagle
         public IEnumerable<string> HiddenCommands()
         {
             return null;
-        }
-
-        public void OnLogOff(IApplication application)
-        {
-            // Careful. This is called before first login. And also where obvious just before shutdown.
-            System.Diagnostics.Debug.WriteLine("OnLogOff");
-        }
-
-        public void OnLogOn(IApplication application)
-        {
-            vaultCom = new VaultCommunication();
-            this.application = application;
-
-            invokeControl.DoThreadSafeAsync(() =>
-            {
-                if (application.Connection != null)
-                {
-                    InitializeFromConnectionOnLogon();
-                }
-                else
-                {
-                    CallInitializeLater();
-                }
-            });
-        }
-
-        public void OnShutdown(IApplication application)
-        {
-            if (thread != null)
-            {
-                thread.Stop();
-                thread = null;
-            }
-        }
-
-        public void OnStartup(IApplication application)
-        {
-            CreateInvokeControl();
-            System.Diagnostics.Debug.WriteLine("OnStartup");
-
-            // deletes Menus.xml after install, so our commands appear in the Main Menu
-            string[] commandsToLookFor =
-            {
-            STR_MSAB_ShowSubscriptionCommand,
-#if DEBUG
-            STR_MSAB_RunTests,
-#endif
-            };
-
-#if DEBUG
-            _ExtensionHookForTests = this;
-#endif
         }
 
         public void RunTests(bool alwaysShowLogWindows)
@@ -430,5 +433,38 @@ namespace VaultEagle
 
         //    //new NUnitLite.Runner.TextUI(sw).Execute(new string[0]);
         //    var tempfile = Path.GetTempFileName();
+        #endregion
+    }
+
+    public static class WinformsExtensionMethods
+    {
+        public static IEnumerable<TreeNode> AsEnumerable(this TreeNodeCollection nodes)
+        {
+            return nodes.Cast<TreeNode>();
+        }
+
+        public static void DoThreadSafeSynchronous(this Control control, Action action)
+        {
+            if (control.InvokeRequired)
+                control.Invoke(action);
+            else
+                action();
+        }
+
+        public static TResult DoThreadSafeSynchronous<TResult>(this Control control, Func<TResult> func)
+        {
+            if (control.InvokeRequired)
+                return (TResult)control.Invoke(func);
+            else
+                return func();
+        }
+
+        public static void DoThreadSafeAsync(this Control control, Action action)
+        {
+            if (control.InvokeRequired)
+                control.BeginInvoke(action); // execute async, Control.BeginInvoke executes calls in-order, queuing items on the message-pump
+            else
+                action();
+        }
     }
 }

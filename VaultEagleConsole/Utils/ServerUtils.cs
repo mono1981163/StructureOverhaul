@@ -37,17 +37,51 @@ namespace VaultEagleConsole
             return false;
         }
 
-        // return - response from url
-        public static Task<PingReply> PingAsync(string address)
+        public static void DoWithRetry(IProgressWindow logger, Action action, int numberOfRetries, TimeSpan? retryDelay)
         {
-            var tcs = new TaskCompletionSource<PingReply>();
-            Ping ping = new Ping();
-            ping.PingCompleted += (obj, sender) =>
+            var retryDelayInSecondsSchedule =
+                retryDelay.HasValue
+                    ? new[] { retryDelay.Value }.Cycle()
+                    : new[]
+                        {
+                            10,
+                            30,
+                            60,
+                            5*60,
+                            10*60,
+                            15*60,
+                            60*60,
+                            2*60*60,
+                        }.Concat(new[] { 2 * 60 * 60 }.Cycle())
+                         .Select(x => TimeSpan.FromSeconds(x));
+
+            foreach (var delay in retryDelayInSecondsSchedule.Take(numberOfRetries))
             {
-                tcs.SetResult(sender.Reply);
-            };
-            ping.SendAsync(address, new object());
-            return tcs.Task;
+                try
+                {
+                    action();
+                    return;
+                }
+                catch (SimpleException<DoNotRetry> ex)
+                {
+                    if (ex.InnerException != null)
+                        throw ex.InnerException;
+                    throw new ErrorMessageException(ex.Message);
+                }
+                catch (ErrorMessageException ex)
+                {
+                    logger.Log("Error: " + ex.Message);
+                    logger.Log("Waiting to retry... (" + delay.ToPrettyFormat() + ")");
+                    System.Threading.Thread.Sleep(delay);
+                }
+                catch (Exception ex)
+                {
+                    logger.Log(VaultServerException.WrapException(ex).ToString());
+                    logger.Log("Waiting to retry... (" + delay.ToPrettyFormat() + ")");
+                    System.Threading.Thread.Sleep(delay);
+                }
+            }
+            action();
         }
 
         public static void ParseVaultUrl(string vaultUrl, ref string user, ref string pass, ref string server, ref string vault, ref string path)
@@ -95,6 +129,18 @@ namespace VaultEagleConsole
             }
         }
 
+        // return - response from url
+        public static Task<PingReply> PingAsync(string address)
+        {
+            var tcs = new TaskCompletionSource<PingReply>();
+            Ping ping = new Ping();
+            ping.PingCompleted += (obj, sender) =>
+            {
+                tcs.SetResult(sender.Reply);
+            };
+            ping.SendAsync(address, new object());
+            return tcs.Task;
+        }
         private static void SetIfNotNullOrEmpty(ref string target, string s)
         {
             if (!string.IsNullOrEmpty(s))
@@ -102,53 +148,6 @@ namespace VaultEagleConsole
         }
 
         public class DoNotRetry { }
-
-        public static void DoWithRetry(IProgressWindow logger, Action action, int numberOfRetries, TimeSpan? retryDelay)
-        {
-            var retryDelayInSecondsSchedule =
-                retryDelay.HasValue
-                    ? new[] { retryDelay.Value }.Cycle()
-                    : new[]
-                        {
-                            10,
-                            30,
-                            60,
-                            5*60,
-                            10*60,
-                            15*60,
-                            60*60,
-                            2*60*60,
-                        }.Concat(new[] { 2 * 60 * 60 }.Cycle())
-                         .Select(x => TimeSpan.FromSeconds(x));
-
-            foreach (var delay in retryDelayInSecondsSchedule.Take(numberOfRetries))
-            {
-                try
-                {
-                    action();
-                    return;
-                }
-                catch (SimpleException<DoNotRetry> ex)
-                {
-                    if (ex.InnerException != null)
-                        throw ex.InnerException;
-                    throw new ErrorMessageException(ex.Message);
-                }
-                catch (ErrorMessageException ex)
-                {
-                    logger.Log("Error: " + ex.Message);
-                    logger.Log("Waiting to retry... (" + delay.ToPrettyFormat() + ")");
-                    System.Threading.Thread.Sleep(delay);
-                }
-                catch (Exception ex)
-                {
-                    logger.Log(VaultServerException.WrapException(ex).ToString());
-                    logger.Log("Waiting to retry... (" + delay.ToPrettyFormat() + ")");
-                    System.Threading.Thread.Sleep(delay);
-                }
-            }
-            action();
-        }
     }
     
 }

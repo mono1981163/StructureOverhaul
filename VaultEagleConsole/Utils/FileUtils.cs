@@ -12,19 +12,52 @@ using Option = Common.DotNet.Extensions.Option;
 
 namespace VaultEagleConsole
 {
-    public class DummyProgressReporter : IProgressWindow
+    public static class FileUtils
     {
-        public void Log(string text, string detailed) { }
-        public void LogWithProgress(string text, int progress) { }
-        public void LogDone(bool failed) { }
-        public void Show() { }
-    }
+        public static DateTime ParseLogTime(string logFileName, string logName, string parseString)
+        {
+            string dateTimeText = logFileName.Substring(logName.Length + 1, 19);
+            return DateTime.ParseExact(dateTimeText, parseString, new CultureInfo("en-US"));
+        }
 
-    public class DummySysTrayNotifyIconService : ISysTrayNotifyIconService
-    {
-        public void Start() { }
-        public void ShowIfSlow(string s) { }
-        public void ShowNow(string s, bool ignoreMinimumDisplayTime) { }
+        public static Option<TimeSpan> ParseTimeSpan(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s))
+                return Option.None;
+            if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*s?$"))
+                return s.TrimStringAtEnd("s").Trim().OptionParseDouble().Transform(TimeSpan.FromSeconds);
+            if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*(m|min)$"))
+                return s.TrimStringAtEnd("min").TrimStringAtEnd("m").Trim().OptionParseDouble().Transform(TimeSpan.FromMinutes);
+            if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*h$"))
+                return s.TrimStringAtEnd("h").Trim().OptionParseDouble().Transform(TimeSpan.FromHours);
+            return Option.None;
+        }
+
+        public static void RemoveOldLogFiles(string path, string logFileName, int allowedOldLogs)
+        {
+            List<FileInfo> oldLogFiles = new List<FileInfo>();
+            foreach (FileInfo fileInLogPath in new DirectoryInfo(path).GetFiles())
+                if (fileInLogPath.Name.StartsWith(logFileName))
+                    oldLogFiles.Add(fileInLogPath);
+
+            oldLogFiles.OrderBy(fileInfo => ParseLogTime(fileInfo.Name, logFileName, "yyyy-MM-dd HH-mm-ss"));
+
+            while (oldLogFiles.Count >= allowedOldLogs)
+            {
+                FileInfo oldestLogFile = oldLogFiles.First();
+                oldLogFiles.Remove(oldestLogFile);
+                using (FileAttributeHandler attributeHandler = new FileAttributeHandler(oldestLogFile.FullName))
+                    System.IO.File.Delete(oldestLogFile.FullName);
+            }
+        }
+        public static void ShowHelp(OptionSet p)
+        {
+            Console.WriteLine("Usage: VaultEagleConsole [OPTIONS]+ USER:PASS@SERVER/VAULT[/$/VAULTPATH/]");
+            Console.WriteLine("Vault Eagle updates subscribed files from Vault. It checks if files are up to date");
+            Console.WriteLine();
+            Console.WriteLine("Options:");
+            p.WriteOptionDescriptions(Console.Out);
+        }
     }
 
     public class ConsoleProgressReporter : IProgressWindow
@@ -40,6 +73,8 @@ namespace VaultEagleConsole
             }
         }
 
+        public void LogDone(bool failed) { }
+
         public void LogWithProgress(string text, int progress)
         {
             lock (this)
@@ -48,11 +83,26 @@ namespace VaultEagleConsole
                     Console.WriteLine("{0} ({1}%)", text, progress);
             }
         }
-
-        public void LogDone(bool failed) { }
         public void Show() { }
     }
 
+    public class DummyProgressReporter : IProgressWindow
+    {
+        public void Log(string text, string detailed) { }
+        public void LogDone(bool failed) { }
+
+        public void LogWithProgress(string text, int progress) { }
+        public void Show() { }
+    }
+
+    public class DummySysTrayNotifyIconService : ISysTrayNotifyIconService
+    {
+        public void ShowIfSlow(string s) { }
+
+        public void ShowNow(string s, bool ignoreMinimumDisplayTime) { }
+
+        public void Start() { }
+    }
     class FileAttributeHandler : IDisposable
     {
         private FileAttributes Attributes;
@@ -73,54 +123,4 @@ namespace VaultEagleConsole
                 System.IO.File.SetAttributes(Path, Attributes);
         }
     }
-
-    public static class FileUtils
-    {
-        public static void RemoveOldLogFiles(string path, string logFileName, int allowedOldLogs)
-        {
-            List<FileInfo> oldLogFiles = new List<FileInfo>();
-            foreach (FileInfo fileInLogPath in new DirectoryInfo(path).GetFiles())
-                if (fileInLogPath.Name.StartsWith(logFileName))
-                    oldLogFiles.Add(fileInLogPath);
-
-            oldLogFiles.OrderBy(fileInfo => ParseLogTime(fileInfo.Name, logFileName, "yyyy-MM-dd HH-mm-ss"));
-
-            while (oldLogFiles.Count >= allowedOldLogs)
-            {
-                FileInfo oldestLogFile = oldLogFiles.First();
-                oldLogFiles.Remove(oldestLogFile);
-                using (FileAttributeHandler attributeHandler = new FileAttributeHandler(oldestLogFile.FullName))
-                    System.IO.File.Delete(oldestLogFile.FullName);
-            }
-        }
-
-        public static DateTime ParseLogTime(string logFileName, string logName, string parseString)
-        {
-            string dateTimeText = logFileName.Substring(logName.Length + 1, 19);
-            return DateTime.ParseExact(dateTimeText, parseString, new CultureInfo("en-US"));
-        }
-        public static Option<TimeSpan> ParseTimeSpan(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s))
-                return Option.None;
-            if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*s?$"))
-                return s.TrimStringAtEnd("s").Trim().OptionParseDouble().Transform(TimeSpan.FromSeconds);
-            if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*(m|min)$"))
-                return s.TrimStringAtEnd("min").TrimStringAtEnd("m").Trim().OptionParseDouble().Transform(TimeSpan.FromMinutes);
-            if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^[0-9]+\s*h$"))
-                return s.TrimStringAtEnd("h").Trim().OptionParseDouble().Transform(TimeSpan.FromHours);
-            return Option.None;
-        }
-
-        public static void ShowHelp(OptionSet p)
-        {
-            Console.WriteLine("Usage: VaultEagleConsole [OPTIONS]+ USER:PASS@SERVER/VAULT[/$/VAULTPATH/]");
-            Console.WriteLine("Vault Eagle updates subscribed files from Vault. It checks if files are up to date");
-            Console.WriteLine();
-            Console.WriteLine("Options:");
-            p.WriteOptionDescriptions(Console.Out);
-        }
-    }
-
-
 }
