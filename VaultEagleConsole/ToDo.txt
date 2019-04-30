@@ -1,0 +1,4 @@
+﻿-r| recursive flag.
+-o| output flag.
+Mirror and delete should not work directly in a root or mapped drive c:\, %ProgramData%, %AppData%, Program Files and x86, Desktop no unc.
+Relative Paths

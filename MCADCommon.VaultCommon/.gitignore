@@ -1,0 +1,10 @@
+Debug
+/.vs/PropertyManager/v14/*.suo
+bin
+obj
+packages
+Content/bin/Debug
+/obj/Debug
+/obj/Release
+/bin/Release
+/*.TMP

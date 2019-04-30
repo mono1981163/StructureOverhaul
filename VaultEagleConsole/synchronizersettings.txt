@@ -1,0 +1,28 @@
+﻿  <configuration_path>%localappdata%/MCAD/VaultEagle 2017/configuration</configuration_path> // here log is saved and last_sync_time property is saved here aswell.
+
+  Some examples:
+  <synchronization_commands>
+    <synchronization_command>-i|$/Data -e|Airbox AB -p|.ipt,.iam,.txt -lf|test.exe,test2.exe -d|$/Data/Powertrain,$/Data/Steering ST/M-ST-1000.ipt -fm|source=$/Data/Electrical EL;target=E:\data\electical el,source=$/Data/Chassis CH;E:\data\chassies -m|$/Data/Chassis CH</synchronization_command>
+    <synchronization_command>-i|$/Data/test.bat -run|.bat</synchronization_command>
+    <synchronization_command>-i|$/Libraries -w| -fm|source=$/Libraries;target=E:\Data\Libraries</synchronization_command>
+    <synchronization_command>-i|$/Data/Airbox AB -p|/</synchronization_command>
+  </synchronization_commands>
+
+  Flags:
+   -i| input flag, what vault path to synchronize.
+   -e| exclude sub path from input, can be folders and files. (',' separated => '$/test,$/abs/test1.txt'.)
+   -p| patterns to include. '/' => only download folders. If excluded from command download all file types. ',' separated.
+   -lf| Files that needs special treatment (running files). ',' separated.
+   -d| delete these, can be folders and files. ',' separated.
+   -w| make the files writable (Removes readonly flag). Should NOT be followed by input.
+   -run| Run these file patterns. ',' separated. Files will only be run if they're downloaded.
+   -m| Mirror folders. Will remove files not in the vault folder from folder. ',' separated.
+   -fm|source=;target= Folder mappings, these affect other flags (such as mirror). source and target separated with ';'. Multiple mappings separated with ','.
+
+  <vault_root>E:\VaultEagle\test</vault_root>
+
+  <run_files>
+    <get_and_run>$/Data/test.bat</get_and_run> // If you don't want to use the -run| flag, you can add the file here to run. Files will only be run if they're downloaded.
+  </run_files>
+
+  <network_retries>5</network_retries>

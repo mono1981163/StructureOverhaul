@@ -1,0 +1,135 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{7B65D456-B0F9-4629-B1CD-3F2AB0E4E36D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>MCADBuild</RootNamespace>
+    <AssemblyName>MCADBuild</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="SynchronizerSettings.config">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="vaulteagle.applicationsettings.config" />
+    <None Include="VaultEagle.vcet.config" />
+    <None Include="vaulteagleconsole.applicationsettings.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>setlocal enableDelayedExpansion
+
+set VERSION=2019
+set CUSTOMER=MCAD
+set PRODUCT=MCADEagle
+set PRODUCT_NAME=VaultEagle
+
+if "$(configurationName)"=="Release" (
+
+  set OUTPUT_PATH=$(SolutionDir)releases\!PRODUCT! !VERSION!.Current
+
+  if not exist "$(SolutionDir)releases" mkdir "$(SolutionDir)releases"
+  if not exist "!OUTPUT_PATH!" mkdir "!OUTPUT_PATH!"
+  
+  xcopy "$(SolutionDir)install.txt" "!OUTPUT_PATH!" /y
+  xcopy "$(SolutionDir)changelog.txt" "!OUTPUT_PATH!" /y
+  
+
+rem =======================================================================================================
+
+rem =======================================================================================================
+
+rem =======================================================================================================
+
+  set COMPONENT=VaultEagle
+  set PRODUCT_PATH=!OUTPUT_PATH!\!COMPONENT!
+
+  if not exist "!PRODUCT_PATH!" mkdir "!PRODUCT_PATH!"
+
+  xcopy "$(SolutionDir)!PRODUCT_NAME!\bin\Release\*.dll" "!PRODUCT_PATH!" /y
+  xcopy "$(SolutionDir)!PRODUCT_NAME!\bin\Release\*.xml" "!PRODUCT_PATH!" /y
+  copy "$(SolutionDir)MCADBuild\vaulteagle.applicationsettings.config" "!PRODUCT_PATH!\applicationsettings.config" /y
+  copy "$(SolutionDir)MCADBuild\VaultEagle.vcet.config" "!PRODUCT_PATH!" /y
+
+ 
+rem =======================================================================================================
+
+rem =======================================================================================================
+
+rem =======================================================================================================
+
+  set COMPONENT=VaultEagleConsole
+  set PRODUCT_PATH=!OUTPUT_PATH!\!COMPONENT!
+
+  if not exist "!PRODUCT_PATH!" mkdir "!PRODUCT_PATH!"
+
+  xcopy "$(SolutionDir)!COMPONENT!\bin\Release\*.dll" "!PRODUCT_PATH!" /y
+  xcopy "$(SolutionDir)!COMPONENT!\bin\Release\*.xml" "!PRODUCT_PATH!" /y
+  xcopy "$(SolutionDir)!COMPONENT!\bin\Release\*.exe" "!PRODUCT_PATH!" /y
+  xcopy "$(SolutionDir)!COMPONENT!\bin\Release\*.manifest" "!PRODUCT_PATH!" /y
+  copy "$(SolutionDir)!COMPONENT!\bin\Release\VaultEagleConsole.exe.config" "!PRODUCT_PATH!" /y
+  copy "$(SolutionDir)!COMPONENT!\bin\Release\VaultEagleConsole.vshost.exe.config" "!PRODUCT_PATH!" /y
+  copy "$(SolutionDir)MCADBuild\vaulteagleconsole.applicationsettings.config" "!PRODUCT_PATH!\applicationsettings.config" /y
+  copy "$(SolutionDir)MCADBuild\SynchronizerSettings.config" "!PRODUCT_PATH!" /y
+ 
+rem =======================================================================================================
+
+rem =======================================================================================================
+
+rem =======================================================================================================
+
+  set COMPONENT=Encrypter
+  set PRODUCT_PATH=!OUTPUT_PATH!\!PRODUCT_NAME!.!COMPONENT!
+
+  if not exist "!PRODUCT_PATH!" mkdir "!PRODUCT_PATH!"
+
+  xcopy "$(SolutionDir)!PRODUCT_NAME!.!COMPONENT!\bin\Release\*.dll" "!PRODUCT_PATH!" /y
+  xcopy "$(SolutionDir)!PRODUCT_NAME!.!COMPONENT!\bin\Release\*.exe" "!PRODUCT_PATH!" /y
+
+
+)
+
+@exit 0</PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

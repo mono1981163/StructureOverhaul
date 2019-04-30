@@ -1,0 +1,14 @@
+VaultEagle
+**********
+put 'MCADVaultEagle' folder in %ProgramData%/Autodesk/Vault 2017/Extensions/.
+
+VaultEagle Console
+******************
+put 'VaultEagleConsole' in desired folder. (example: %ProgramData%/MCAD/).
+update file 'applicationsettings.config'. See applicationsettings.txt for info of how to configure file.
+update file 'synchronizersettings.config'. See synchronizersettings.txt for info of how to configure file.
+
+Run: C:\ProgramData\MCAD\VaultEagleConsole\VaultEagleConsole.exe -sn=mnnvltpro2017 -n=MartinDev -silent  -wa -configuration=$/SynchronizerSettings.config // if windows authentication
+C:\ProgramData\MCAD\VaultEagleConsole\VaultEagleConsole.exe -sn=mnnvltpro2017 -n=MartinDev -silent -vu=user -vp:password -configuration=$/SynchronizerSettings.config // user info
+
+Password can be encrypted with encryptor, then add flag: -ep

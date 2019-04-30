@@ -1,0 +1,24 @@
+[submodule "MCADCommon.VaultCommon"]
+	path = MCADCommon.VaultCommon
+	url = git@10.10.10.232:lib/MCADCommon.VaultCommon.git
+[submodule "MCADCommon.MailCommon"]
+	path = MCADCommon.MailCommon
+	url = git@10.10.10.232:lib/MCADCommon.MailCommon.git
+[submodule "MCADCommon.LogCommon"]
+	path = MCADCommon.LogCommon
+	url = git@10.10.10.232:lib/MCADCommon.LogCommon.git
+[submodule "MCADCommon.EncryptionCommon"]
+	path = MCADCommon.EncryptionCommon
+	url = git@10.10.10.232:lib/MCADCommon.EncryptionCommon.git
+[submodule "MCAD.XmlCommon"]
+	path = MCAD.XmlCommon
+	url = git@10.10.10.232:lib/MCAD.XmlCommon.git
+[submodule "Common.DotNet.Extensions"]
+	path = Common.DotNet.Extensions
+	url = git@10.10.10.232:lib/Common.DotNet.Extensions.git
+[submodule "vendor/autodesk/vault"]
+	path = vendor/autodesk/vault
+	url = git@10.10.10.232:autodesk_vendor/Vault.git
+[submodule "MCADCommon"]
+	path = MCADCommon
+	url = git@10.10.10.232:lib/MCADCommon.git

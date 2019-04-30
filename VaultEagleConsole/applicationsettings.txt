@@ -1,0 +1,15 @@
+﻿  <configuration_path>%localappdata%\MCAD\VaultEagle\configuration</configuration_path>  --Downloads synchronizing config to this path if a vault file. Saves log file here aswell.
+  <log_level>Info</log_level> --Info, Trace(A lot more log messages), Error
+  <mail_settings> 
+    <sender>martin.norden@mcad.se</sender>
+    <password>N5AFIym+Y2xwXf1RBiyjpw==</password> -- Encrypted with VaultEagle.Encrypter
+    <receivers>
+      <receiver>martin.norden@mcad.se</receiver>
+    </receivers>
+    <host>pod51015.outlook.com</host> -- Mail server
+    <port>587</port>
+    <use_tls>True</use_tls> -- Encrypted
+  </mail_settings>
+  <use_notifications>True</use_notifications> -- Pop up notification when scan start and when it is complete.
+  
+  

@@ -1,0 +1,7 @@
+﻿VaultEagle Console
+******************
+put 'VaultEagleConsole' in desired folder. (example: %ProgramData%/MCAD/).
+update file 'applicationsettings.config'.
+update file 'SynchronizerSettings.config'. See the file for info on how to configure file.
+
+Run: C:\ProgramData\MCAD\VaultEagleConsole\VaultEagleConsole.exe -sn="servername" -n="vaultname" -vu="vaultuser" -vp:"vaultpassword" -configuration="SynchronizerSettings.config"

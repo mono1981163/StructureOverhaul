@@ -1,0 +1,160 @@
+﻿VaultEagle Console
+******************
+
+Version 1.2
+===========
+- 2017 version
+- It is no longer a console, but a exe that can be run with commands. (Can still be run from Command Line)
+- A new command was added -configuration=filePath (file path can be a local path or vault path).
+ - Allows to run the program with extra settings. See synchronizersettings.txt for more info.
+
+1.3
+===
+- 2018 version
+- Configuration file now uses a command line argument system.
+
+1.3.1
+=====
+- Added support for environmental variables.
+- Added support for relative vault paths.
+- Added output flag.
+- Added recursive flag.
+
+1.3.2
+=====
+- Fixed bug when log wasen't written.
+- Fixed bug with output path.
+
+1.3.3
+=====
+- Fixed case sensitive bug.
+- Removed so <run_files> don't need to be in config anymore if it isen't used.
+
+1.3.4
+=====
+- Added more logging.
+
+1.3.5
+=====
+- It is now possible to log into vault as read or write.
+
+1.3.6
+=====
+- Performance improvements when searching for files.
+
+1.4.0
+=====
+- Added support for only downloading certain states (Released, work in progress).
+- Added support for deleting and skipping files of certain states (example: Obsolete).
+- Added support for skipping folder if it has category (example: Under Revision).
+- More logging.
+
+1.4.1
+=====
+- Added a server check to make sure that at least one server is online.
+- Added support for differing log files that are used by a user or a system.
+
+1.4.2
+=====
+- Added support for mailing the log after running the synchronization.
+- Added support for using environmental variables for the senders email address in ApplicationSettings.
+
+1.4.3
+=====
+- Delete command now uses local paths. (Can be relative and use environmental variables).
+- Fixed a bug where mirror command did not delete files correctly.
+
+1.4.4
+=====
+- Fixed issue with mirror if no files were to be downloaded.
+- Fixed so in mirror command empty folders are downloaded.
+
+1.4.5
+=====
+- Fixed bug with output flag and not ending up in the correct folder.
+
+1.4.6
+=====
+- Moved last sync time to synchronizationsettings.
+
+1.5.0
+=====
+- Added so it is possible to override from where mails are sent in synchronizerSettings.
+- Added so logging can be initialized in synchronizerSettings instead of applicationSettings.
+- Can now user enter/tab in -exclude flag.
+
+1.5.1
+=====
+- Fixed minor bug with vault root in synchronization setting.
+
+1.5.2
+=====
+- Added log message if the program failed to read synchronizer settings.
+
+1.5.3
+=====
+- Can now have encrypted password in CLI command.
+
+1.5.4
+=====
+- Added vault flag to sync with remote site if file is unavailable.
+
+1.5.5
+=====
+- Added force flag to force dowload of files even if not needed (-f|)
+- Added lock flag to dowoload files to a temporary location before putting them in the correct one (-lck|)
+  - To be able to download vault addins possibly locked by vault eagle console.
+
+1.5.6
+=====
+- Fixed bug so one level of folders can be downloaded.
+- Fixed bug with bat files running when they shoulden't.
+- Fixed bug with process dying before running file was done.
+
+1.5.7
+=====
+- No longer downloads hidden files.
+
+1.5.8
+=====
+- Fixed bug with downloading files locked by vault.
+
+1.5.9
+=====
+- Fixed bug with directories not being created for files locked by vault.
+
+1.5.10
+======
+- Increased network retry timer to 1s.
+
+1.5.11
+======
+- Improved error log.
+
+1.5.12
+======
+- Further improvement to log.
+
+1.5.13
+======
+- Added more error handlig when creating items.
+
+1.5.14
+======
+- Sets Read & Execute flag for computer group User for all downloaded files.
+
+1.6.0
+=====
+- Don't uses lastsynctime if not specified now..
+
+1.6.1
+=====
+- Does not remove files before downloading now.
+
+1.7.0
+=====
+- Can now download files regarding to tacton file.
+
+1.7.1
+=====
+- Fixed so double dots works in VaultPaths for tacton downloads.
